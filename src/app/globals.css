@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+}
+
+body {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(210 40% 96.1%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(215.4 16.3% 70%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(215.4 16.3% 56.9%);
+}
+
+/* React Flow customization */
+.react-flow__node {
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* JSON display */
+.json-key {
+  color: hsl(222.2 84% 40%);
+}
+
+.json-string {
+  color: hsl(142.1 76.2% 36.3%);
+}
+
+.json-number {
+  color: hsl(346.8 77.2% 49.8%);
+}
+
+.json-boolean {
+  color: hsl(262.1 83.3% 57.8%);
+}
+
+.json-null {
+  color: hsl(215.4 16.3% 46.9%);
+}
+
+/* Mapping wire animation */
+@keyframes pulse-wire {
+  0%, 100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.5;
+  }
+}
+
+.wire-animated {
+  animation: pulse-wire 2s ease-in-out infinite;
+}
