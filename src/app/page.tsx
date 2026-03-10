@@ -11,16 +11,23 @@ import {
   Zap,
   Map,
 } from 'lucide-react';
+import { useEffect } from 'react';
 
 export default function Home() {
-  const { activeTab, setActiveTab, collection, apiBaseUrl, setApiBaseUrl } = useAppStore();
-
+  const { activeTab, setActiveTab, collection, apiBaseUrl, setApiBaseUrl ,clearHistory} = useAppStore();
   const tabs = [
     { id: 'mapper', label: 'cURL Mapper', icon: Map },
     { id: 'test', label: 'Test Console', icon: Play },
     { id: 'collections', label: 'Collections', icon: FolderOpen },
   ] as const;
 
+ useEffect(() => {
+  const navEntries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+
+  if (navEntries.length > 0 && navEntries[0].type === "reload") {
+    clearHistory();
+  }
+}, []);
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Header */}
