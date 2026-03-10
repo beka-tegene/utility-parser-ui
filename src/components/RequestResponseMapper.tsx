@@ -159,6 +159,9 @@ export function RequestResponseMapper() {
   const [copied, setCopied] = useState(false);
   const [currentStepName, setCurrentStepName] = useState("");
   const [showResponseInput, setShowResponseInput] = useState(false);
+  const [collectionName, setCollectionName] = useState("");
+  const [parserCode, setParserCode] = useState("");
+  const [description, setDescription] = useState("");
 
   // Manual HTTP method selection per step
   const [stepHttpMethods, setStepHttpMethods] = useState<
@@ -224,6 +227,8 @@ export function RequestResponseMapper() {
   const currentStepData = multiStepData[templateCode]?.steps?.[activeStepIndex];
   const initialContextMappings = currentStepData?.contextFieldMappings || {};
   const initialOverrideConfigs = currentStepData?.overrideFieldConfigs || {};
+  const [nodes] = useNodesState([]);
+  const [edges] = useEdgesState([]);
 
   // Handle canvas state changes - persist to store
   const handleCanvasStateChange = useCallback(
@@ -249,7 +254,7 @@ export function RequestResponseMapper() {
   }, []);
 
   // Parse cURL command
-  const handleParseCurl = useCallback(() => {
+  const handleParseCurl = useCallback(async () => {
     setError("");
     try {
       if (!curlInput.trim()) {
@@ -302,7 +307,8 @@ export function RequestResponseMapper() {
     } catch (e) {
       setError("Failed to parse cURL command. Please check the format.");
     }
-  }, [curlInput, httpMethod]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curlInput, httpMethod, setParsedRequest, setResponse]);
 
   // Execute request
   const handleExecute = async () => {
@@ -310,14 +316,16 @@ export function RequestResponseMapper() {
 
     setIsExecuting(true);
     setError("");
-
+    const urlEncodedBody = parsedRequest.body
+      ? new URLSearchParams(
+          parsedRequest.body as Record<string, string>,
+        ).toString()
+      : undefined;
     try {
       const res = await fetch(parsedRequest.url, {
         method: parsedRequest.method,
         headers: parsedRequest.headers,
-        body: parsedRequest.body
-          ? JSON.stringify(parsedRequest.body)
-          : undefined,
+        body: urlEncodedBody,
       });
 
       const contentType = res.headers.get("content-type");
@@ -444,20 +452,146 @@ export function RequestResponseMapper() {
     setCurrentStepName("");
     setShowResponseInput(false);
   };
-
+  const [allData, setAllData] = useState<any[]>([]);
   // Export workflow configuration
   const handleExportConfig = () => {
+    // Get all steps from the template
+    const steps = multiStepData[templateCode]?.steps || [];
+    const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
+
+    // Generate templates for all steps
+    const generatedTemplates: Record<string, unknown>[] = [];
+
+    // Iterate through all steps (use steps.length instead of hardcoded 3)
+    steps.forEach((step, index) => {
+      const currentStepData = step;
+      const initialContextMappings =
+        currentStepData?.contextFieldMappings || {};
+      const initialOverrideConfigs =
+        currentStepData?.overrideFieldConfigs || {};
+
+      const responseMapper: Record<string, string> = {};
+      const requestMapper: Record<string, string> = {};
+      const overriddenRequestBody: Array<{
+        field: string;
+        value: string;
+        actual_mapping: string;
+        type: string;
+        max_length?: number;
+        min_length?: number;
+        pattern?: string;
+        required: boolean;
+      }> = [];
+
+      // Response mapper: fields stored in context (original response field -> custom display name)
+      Object.entries(initialContextMappings).forEach(
+        ([originalKey, displayName]) => {
+          responseMapper[originalKey] = displayName;
+        },
+      );
+
+      // Override fields - fields that need user input at runtime with full configuration
+      Object.values(initialOverrideConfigs).forEach((config) => {
+        overriddenRequestBody.push({
+          field: config.field,
+          value: config.value,
+          actual_mapping: config.actual_mapping,
+          type: config.type,
+          required: config.required,
+          ...(config.max_length !== undefined && {
+            max_length: config.max_length,
+          }),
+          ...(config.min_length !== undefined && {
+            min_length: config.min_length,
+          }),
+          ...(config.pattern && { pattern: config.pattern }),
+        });
+      });
+
+      // Request mapper - maps accumulated context to request body
+      edges.forEach((edge) => {
+        if (
+          edge.source.startsWith("response-") &&
+          edge.target.startsWith("request-")
+        ) {
+          const srcNode = nodes.find((n) => n.id === edge.source);
+          const tgtNode = nodes.find((n) => n.id === edge.target);
+          if (srcNode && tgtNode) {
+            const srcKey = srcNode.data.renamedTo || srcNode.data.originalKey;
+            const tgtKey = tgtNode.data.renamedTo || tgtNode.data.originalKey;
+            requestMapper[tgtKey] = `accumulated.${srcKey}`;
+          }
+        }
+      });
+
+      // Determine step progression
+      const currentStepName = step.stepName || "STEP";
+      const currentStepIdx = STEP_ORDER.indexOf(currentStepName);
+      const nextStepName =
+        currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
+          ? STEP_ORDER[currentStepIdx + 1]
+          : "DONE";
+
+      // Build template structure matching backend
+      const template: Record<string, unknown> = {
+        name: currentStepName,
+        current_step: currentStepName,
+        next_step: nextStepName,
+        url: parsedRequest?.url || "",
+        method: parsedRequest?.method || "POST",
+        header_type: parsedRequest?.headers || {},
+        request_mapper:
+          Object.keys(requestMapper).length > 0 ? requestMapper : undefined,
+        response_mapper:
+          Object.keys(responseMapper).length > 0 ? responseMapper : undefined,
+      };
+
+      // Add authorization_mapper if bearer token is detected in headers
+      const authHeader =
+        parsedRequest?.headers?.["Authorization"] ||
+        parsedRequest?.headers?.["authorization"];
+      if (authHeader?.toLowerCase().startsWith("bearer")) {
+        template.authorization_mapper = {
+          type: "bearer",
+          token: "accumulated.access_token",
+        };
+      }
+
+      // Add to_be_overridden only if there are override fields
+      if (overriddenRequestBody.length > 0) {
+        template.to_be_overridden = {
+          overridden_request_body: overriddenRequestBody,
+        };
+      }
+
+      // Add body if exists
+      if (parsedRequest?.body) {
+        template.body = parsedRequest.body;
+      }
+
+      // Remove undefined fields
+      Object.keys(template).forEach((key) => {
+        if (template[key] === undefined) {
+          delete template[key];
+        }
+      });
+
+      generatedTemplates.push(template);
+    });
+
+    // Update state if needed
+
+    // Create the final config
     const config = {
-      steps: workflowContext.steps.map((step) => ({
-        name: step.step,
-        request: step.request,
-        contextFields: Array.from(contextFields),
-        responseFields: Array.from(responseFields),
-      })),
+      name: collectionName,
+      template_code: parserCode,
+      description: description,
+      templates: generatedTemplates, // Use generatedTemplates instead of allData
       mappings: fieldMappings,
       accumulated: workflowContext.accumulated,
     };
 
+    // Download the config
     const blob = new Blob([JSON.stringify(config, null, 2)], {
       type: "application/json",
     });
@@ -524,8 +658,6 @@ export function RequestResponseMapper() {
 
     return <span>{String(data)}</span>;
   };
-  const [nodes] = useNodesState([]);
-  const [edges] = useEdgesState([]);
 
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
@@ -645,6 +777,17 @@ export function RequestResponseMapper() {
     initialOverrideConfigs,
   ]);
 
+  const handleClick = async (event: any) => {
+    event.preventDefault(); // If needed
+
+    try {
+      await handleParseCurl();
+      handleExecute();
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-gray-100">
       {/* Header */}
@@ -718,6 +861,38 @@ export function RequestResponseMapper() {
               Reset
             </button>
           </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 p-4 py-6">
+          <label htmlFor="">
+            <span>Collection Name</span>
+            <input
+              type="text"
+              value={collectionName}
+              onChange={(e) => setCollectionName(e.target.value)}
+              placeholder="Collection Name"
+              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
+          </label>
+          <label htmlFor="">
+            <span>Template Code (unique identifier)</span>
+            <input
+              type="text"
+              value={parserCode}
+              onChange={(e) => setParserCode(e.target.value)}
+              placeholder="Template Code (unique identifier)"
+              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
+          </label>
+          <label htmlFor="">
+            <span>Description</span>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description"
+              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
+          </label>
         </div>
       </div>
 
@@ -806,7 +981,7 @@ export function RequestResponseMapper() {
 
               <div className="flex items-center gap-2 mt-3">
                 <button
-                  onClick={handleParseCurl}
+                  onClick={handleClick}
                   className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                 >
                   <Play className="w-4 h-4" />
@@ -1217,7 +1392,7 @@ export function RequestResponseMapper() {
               <div className="p-4 overflow-auto h-[calc(100%-50px)]">
                 <pre className="font-mono text-xs text-gray-700">
                   {JSON.stringify(generateConfig(), null, 2)}
-                
+
                   {/* {JSON.stringify(
                     isSetupStep
                       ? {

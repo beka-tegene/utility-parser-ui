@@ -137,7 +137,7 @@ export function SetupStepEditor({
   }, [paymentType, payables]);
 
   return (
-    <div className={`bg-white rounded-xl border shadow-sm overflow-hidden ${className}`}>
+    <div className={`bg-white rounded-xl border shadow-sm overflow-y-scroll ${className}`}>
       {/* Header */}
       <div className="px-5 py-4 bg-gradient-to-r from-violet-50 to-purple-50 border-b">
         <div className="flex items-center justify-between">
