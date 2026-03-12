@@ -303,6 +303,61 @@ export function RequestResponseMapper() {
         headers: parsed.headers,
         body: bodyObj,
       });
+
+      const urlEncodedBody = bodyObj
+        ? new URLSearchParams(bodyObj as Record<string, string>).toString()
+        : undefined;
+
+      const res = await fetch(parsed.url, {
+        method: finalMethod,
+        headers: parsed.headers,
+        body: urlEncodedBody,
+      });
+
+      const contentType = res.headers.get("content-type");
+      let responseData: Record<string, unknown>;
+
+      if (contentType?.includes("application/json")) {
+        responseData = await res.json();
+      } else {
+        responseData = { _raw: await res.text() };
+      }
+
+      // Add to workflow steps
+      const newStep: StepData = {
+        step: currentStepName || `Step ${workflowContext.steps.length + 1}`,
+        request: {
+          method: finalMethod,
+          url: parsed.url,
+          headers: parsed.headers,
+          body: bodyObj,
+        },
+        response: responseData,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Update accumulated context based on marked fields
+      const newAccumulated = { ...workflowContext.accumulated };
+      contextFields.forEach((fieldPath) => {
+        // Extract the value from response
+        const parts = fieldPath.replace("response.", "").split(".");
+        let value: unknown = responseData;
+        for (const part of parts) {
+          if (value && typeof value === "object") {
+            value = (value as Record<string, unknown>)[part];
+          }
+        }
+        if (value !== undefined) {
+          newAccumulated[parts.join(".")] = value;
+        }
+      });
+
+      setWorkflowContext((prev) => ({
+        accumulated: newAccumulated,
+        steps: [...prev.steps, newStep],
+      }));
+      setResponse(responseData);
+
       setResponse(null);
     } catch (e) {
       setError("Failed to parse cURL command. Please check the format.");
@@ -782,7 +837,7 @@ export function RequestResponseMapper() {
 
     try {
       await handleParseCurl();
-      handleExecute();
+      // handleExecute();
     } catch (error) {
       console.error("Error:", error);
     }
