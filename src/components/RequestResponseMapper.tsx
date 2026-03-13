@@ -254,6 +254,8 @@ export function RequestResponseMapper() {
   }, []);
 
   // Parse cURL command
+  // Replace the handleParseCurl function with this fixed version:
+
   const handleParseCurl = useCallback(async () => {
     setError("");
     try {
@@ -297,12 +299,16 @@ export function RequestResponseMapper() {
           : "GET";
       const finalMethod = httpMethod || detectedMethod;
 
+      // Set the parsed request
       setParsedRequest({
         method: finalMethod,
         url: parsed.url,
         headers: parsed.headers,
         body: bodyObj,
       });
+
+      // Execute the request
+      setIsExecuting(true);
 
       const urlEncodedBody = bodyObj
         ? new URLSearchParams(bodyObj as Record<string, string>).toString()
@@ -322,6 +328,10 @@ export function RequestResponseMapper() {
       } else {
         responseData = { _raw: await res.text() };
       }
+
+      // Set the response
+      setResponse(responseData);
+      setIsExecuting(false);
 
       // Add to workflow steps
       const newStep: StepData = {
@@ -356,15 +366,19 @@ export function RequestResponseMapper() {
         accumulated: newAccumulated,
         steps: [...prev.steps, newStep],
       }));
-      setResponse(responseData);
-
-      setResponse(null);
     } catch (e) {
-      setError("Failed to parse cURL command. Please check the format.");
+      setError(
+        `Failed to execute request: ${e instanceof Error ? e.message : "Unknown error"}`,
+      );
+      setIsExecuting(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curlInput, httpMethod, setParsedRequest, setResponse]);
-
+  }, [
+    curlInput,
+    httpMethod,
+    currentStepName,
+    workflowContext.accumulated,
+    contextFields,
+  ]);
   // Execute request
   const handleExecute = async () => {
     if (!parsedRequest) return;
@@ -714,9 +728,13 @@ export function RequestResponseMapper() {
     return <span>{String(data)}</span>;
   };
 
+  // Replace the generateConfig function in your RequestResponseMapper component with this:
+
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
     const requestMapper: Record<string, string> = {};
+    const staticFields: Record<string, string> = {};
+    const credentials: Record<string, string> = {};
     const overriddenRequestBody: Array<{
       field: string;
       value: string;
@@ -728,14 +746,56 @@ export function RequestResponseMapper() {
       required: boolean;
     }> = [];
 
-    // Response mapper: fields stored in context (original response field -> custom display name)
-    Object.entries(initialContextMappings).forEach(
-      ([originalKey, displayName]) => {
-        responseMapper[originalKey] = displayName;
-      },
-    );
-    // Override fields - fields that need user input at runtime with full configuration
-    Object.values(initialOverrideConfigs).forEach((config) => {
+    // Get current step's canvas state from multiStepData
+    const currentStepData =
+      multiStepData[templateCode]?.steps?.[activeStepIndex];
+    const contextMappings = currentStepData?.contextFieldMappings || {};
+    const overrideConfigs = currentStepData?.overrideFieldConfigs || {};
+
+    // Build response mapper from context field mappings
+    // In response_mapper, the key is the field name and value is the path or value
+    Object.entries(contextMappings).forEach(([path, displayName]) => {
+      // Format path to use dots instead of brackets for the key
+      const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
+      responseMapper[displayName] = formattedKey;
+    });
+
+    // Build request mapper from edges (connections between response and request)
+    // In request_mapper, the key is the target field and value is the source path
+    edges.forEach((edge) => {
+      if (
+        edge.source.startsWith("response-") &&
+        edge.target.startsWith("request-")
+      ) {
+        const srcNode = nodes.find((n) => n.id === edge.source);
+        const tgtNode = nodes.find((n) => n.id === edge.target);
+        if (srcNode && tgtNode) {
+          // Get the target key (request field)
+          const tgtKey = tgtNode.data.renamedTo || tgtNode.data.originalKey;
+
+          // Get the source path (response field)
+          let srcPath = srcNode.data.originalKey || srcNode.data.key;
+
+          // Format path to use dots instead of brackets
+          srcPath = srcPath.replace(/\[/g, ".").replace(/\]/g, "");
+
+          // Check if this is a static value or a reference
+          if (
+            srcNode.data.value &&
+            typeof srcNode.data.value === "string" &&
+            !srcNode.data.value.includes("{{") &&
+            !srcNode.data.value.includes("accumulated.")
+          ) {
+            staticFields[tgtKey] = srcNode.data.value as string;
+          } else {
+            requestMapper[tgtKey] = srcPath;
+          }
+        }
+      }
+    });
+
+    // Build override fields from override configs
+    Object.values(overrideConfigs).forEach((config) => {
       overriddenRequestBody.push({
         field: config.field,
         value: config.value,
@@ -752,72 +812,80 @@ export function RequestResponseMapper() {
       });
     });
 
-    // Request mapper - maps accumulated context to request body
-    edges.forEach((edge) => {
-      if (
-        edge.source.startsWith("response-") &&
-        edge.target.startsWith("request-")
-      ) {
-        const srcNode = nodes.find((n) => n.id === edge.source);
-        const tgtNode = nodes.find((n) => n.id === edge.target);
-        if (srcNode && tgtNode) {
-          const srcKey = srcNode.data.renamedTo || srcNode.data.originalKey;
-          const tgtKey = tgtNode.data.renamedTo || tgtNode.data.originalKey;
-          requestMapper[tgtKey] = `accumulated.${srcKey}`;
+    // Extract credentials from request body for TOKEN step
+    if (currentStepName === "TOKEN" && parsedRequest?.body) {
+      Object.entries(parsedRequest.body).forEach(([key, value]) => {
+        if (
+          typeof value === "string" &&
+          (key.includes("client_") ||
+            key.includes("secret") ||
+            key.includes("DEST_"))
+        ) {
+          credentials[key] = value;
         }
-      }
-    });
+      });
+    }
 
     // Determine step progression
     const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
-    const currentStepName1 = currentStepName || "STEP";
-    const currentStepIdx = STEP_ORDER.indexOf(currentStepName1);
+    const currentStepIdx = STEP_ORDER.indexOf(currentStepName);
     const nextStepName =
       currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
         ? STEP_ORDER[currentStepIdx + 1]
         : "DONE";
 
-    // Build template structure matching backend
+    // Build template structure matching the desired format
     const template: Record<string, unknown> = {
-      name: currentStepName1,
-      current_step: currentStepName1,
+      name: currentStepName || "STEP",
+      parser_code: `${parserCode}_${currentStepName?.toLowerCase()}_v10`,
+      current_step: currentStepName || "STEP",
       next_step: nextStepName,
+      description: `${currentStepName?.toLowerCase()} step`,
       url: parsedRequest?.url || "",
       method: parsedRequest?.method || "POST",
       header_type: parsedRequest?.headers || {},
-      request_mapper:
-        Object.keys(requestMapper).length > 0 ? requestMapper : undefined,
-      response_mapper:
-        Object.keys(responseMapper).length > 0 ? responseMapper : undefined,
+      authorization_mapper: {},
+      credentials: credentials,
+      static_fields: staticFields,
+      body: parsedRequest?.body || {},
     };
 
-    // Add authorization_mapper if bearer token is detected in headers
+    // Add request_mapper if not empty
+    if (Object.keys(requestMapper).length > 0) {
+      template.request_mapper = requestMapper;
+    }
+
+    // Add response_mapper if not empty
+    if (Object.keys(responseMapper).length > 0) {
+      template.response_mapper = responseMapper;
+    }
+
+    // Add authorization_mapper if bearer token detected
     const authHeader =
       parsedRequest?.headers?.["Authorization"] ||
       parsedRequest?.headers?.["authorization"];
     if (authHeader?.toLowerCase().startsWith("bearer")) {
-      // Check if token references accumulated context
       template.authorization_mapper = {
-        type: "bearer",
-        token: "accumulated.access_token",
+        type: "Bearer",
+        token: "{{accumulated.access_token}}",
       };
     }
 
-    // Add to_be_overridden only if there are override fields
+    // Add to_be_overridden if not empty
     if (overriddenRequestBody.length > 0) {
       template.to_be_overridden = {
         overridden_request_body: overriddenRequestBody,
       };
     }
 
-    // Add body if exists
-    if (parsedRequest?.body) {
-      template.body = parsedRequest.body;
-    }
-
     // Remove undefined fields
     Object.keys(template).forEach((key) => {
-      if (template[key] === undefined) {
+      if (
+        template[key] === undefined ||
+        (typeof template[key] === "object" &&
+          template[key] !== null &&
+          Object.keys(template[key] as object).length === 0)
+      ) {
         delete template[key];
       }
     });
@@ -828,8 +896,10 @@ export function RequestResponseMapper() {
     edges,
     parsedRequest,
     currentStepName,
-    initialContextMappings,
-    initialOverrideConfigs,
+    multiStepData,
+    templateCode,
+    activeStepIndex,
+    parserCode,
   ]);
 
   const handleClick = async (event: any) => {

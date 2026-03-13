@@ -83,8 +83,11 @@ interface ArrayObjectNodeData {
   isMappedToContext?: boolean;
   contextKey?: string;
   renamedTo?: string;
-  selectedItems?: Set<number>;
-  onSelectionChange?: (nodeId: string, selectedIndices: Set<number>) => void;
+  selectedItems?: Map<string, { path: string; key: string; value: string }>;
+  onSelectionChange?: (
+    nodeId: string,
+    selections: Map<string, { path: string; key: string; value: string }>,
+  ) => void;
 }
 
 // ============ Colors ============
@@ -142,9 +145,9 @@ function ArrayObjectNode({
   const [isEditing, setIsEditing] = useState(false);
   const [editKey, setEditKey] = useState(data.renamedTo || data.key);
   const [editableItems, setEditableItems] = useState(data.items);
-  const [selectedItems, setSelectedItems] = useState<Set<number>>(
-    data.selectedItems || new Set(),
-  );
+  const [selectedItems, setSelectedItems] = useState<
+    Map<string, { path: string; key: string; value: string }>
+  >(data.selectedItems || new Map());
 
   useEffect(() => {
     setEditableItems(data.items);
@@ -163,25 +166,78 @@ function ArrayObjectNode({
     setIsEditing(false);
   };
 
-  const handleValueChange = (itemIndex: number, newValue: string) => {
+  const handleValueChange = (
+    parentIndex: number,
+    subFieldIndex: number | null,
+    key: string,
+    newValue: string,
+  ) => {
     const updatedItems = [...editableItems];
-    if (updatedItems[itemIndex] && "Value" in updatedItems[itemIndex]) {
-      updatedItems[itemIndex] = {
-        ...updatedItems[itemIndex],
+
+    if (
+      subFieldIndex !== null &&
+      updatedItems[parentIndex] &&
+      "Sub_Fields" in updatedItems[parentIndex]
+    ) {
+      const subFields = [...(updatedItems[parentIndex].Sub_Fields as any[])];
+      if (subFields[subFieldIndex]) {
+        subFields[subFieldIndex] = {
+          ...subFields[subFieldIndex],
+          Value: newValue,
+        };
+        updatedItems[parentIndex] = {
+          ...updatedItems[parentIndex],
+          Sub_Fields: subFields,
+        };
+        setEditableItems(updatedItems);
+        data.items = updatedItems;
+
+        // Update selected item if it exists
+        if (selectedItems.has(`${parentIndex}-${subFieldIndex}`)) {
+          const newSelected = new Map(selectedItems);
+          newSelected.set(`${parentIndex}-${subFieldIndex}`, {
+            path: `${data.key}[${parentIndex}].Sub_Fields[${subFieldIndex}].Value`,
+            key,
+            value: newValue,
+          });
+          setSelectedItems(newSelected);
+        }
+      }
+    } else if (
+      updatedItems[parentIndex] &&
+      "Value" in updatedItems[parentIndex]
+    ) {
+      updatedItems[parentIndex] = {
+        ...updatedItems[parentIndex],
         Value: newValue,
       };
       setEditableItems(updatedItems);
       data.items = updatedItems;
+
+      // Update selected item if it exists
+      if (selectedItems.has(`${parentIndex}`)) {
+        const newSelected = new Map(selectedItems);
+        newSelected.set(`${parentIndex}`, {
+          path: `${data.key}[${parentIndex}].Value`,
+          key,
+          value: newValue,
+        });
+        setSelectedItems(newSelected);
+      }
     }
   };
 
-  const toggleItemSelection = (itemIndex: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newSelected = new Set(selectedItems);
-    if (newSelected.has(itemIndex)) {
-      newSelected.delete(itemIndex);
+  const toggleItemSelection = (
+    uniqueId: string,
+    path: string,
+    key: string,
+    value: string,
+  ) => {
+    const newSelected = new Map(selectedItems);
+    if (newSelected.has(uniqueId)) {
+      newSelected.delete(uniqueId);
     } else {
-      newSelected.add(itemIndex);
+      newSelected.set(uniqueId, { path, key, value });
     }
     setSelectedItems(newSelected);
   };
@@ -194,6 +250,48 @@ function ArrayObjectNode({
   const colors =
     categoryColors[displayCategory] || categoryColors[data.category];
 
+  // Flatten items for display if they have Sub_Fields
+  const flattenedItems = useMemo(() => {
+    const items: Array<{
+      uniqueId: string;
+      parentIndex: number;
+      subIndex: number | null;
+      path: string;
+      key: string;
+      value: string;
+    }> = [];
+
+    editableItems.forEach((item, parentIdx) => {
+      if (item.Sub_Fields && Array.isArray(item.Sub_Fields)) {
+        (item.Sub_Fields as any[]).forEach((subItem, subIdx) => {
+          if (subItem.Key && subItem.Value !== undefined) {
+            const path = `${data.key}[${parentIdx}].Sub_Fields[${subIdx}].Value`;
+            items.push({
+              uniqueId: `${parentIdx}-${subIdx}`,
+              parentIndex: parentIdx,
+              subIndex: subIdx,
+              path,
+              key: String(subItem.Key),
+              value: String(subItem.Value),
+            });
+          }
+        });
+      } else if (item.Key && item.Value !== undefined) {
+        const path = `${data.key}[${parentIdx}].Value`;
+        items.push({
+          uniqueId: `${parentIdx}`,
+          parentIndex: parentIdx,
+          subIndex: null,
+          path,
+          key: String(item.Key),
+          value: String(item.Value),
+        });
+      }
+    });
+
+    return items;
+  }, [editableItems, data.key]);
+
   return (
     <div
       className={`group relative rounded-xl border-2 shadow-lg transition-all duration-200 cursor-grab active:cursor-grabbing backdrop-blur-sm
@@ -202,7 +300,7 @@ function ArrayObjectNode({
         ${data.isOverride ? "ring-2 ring-rose-400 ring-offset-1" : ""}
         ${data.isMappedToContext ? "ring-2 ring-violet-400 ring-offset-1" : ""}
         hover:shadow-xl hover:scale-[1.02]`}
-      style={{ minWidth: 400, maxWidth: 500 }}
+      style={{ minWidth: 450, maxWidth: 550 }}
       onClick={(e) => e.stopPropagation()}
     >
       <Handle
@@ -261,19 +359,19 @@ function ArrayObjectNode({
                 {data.renamedTo || data.key}
               </span>
               <span className="text-[10px] px-2 py-0.5 bg-white/20 rounded-full text-white font-medium ml-auto">
-                {editableItems.length} items ({selectedItems.size} selected)
+                {flattenedItems.length} items ({selectedItems.size} selected)
               </span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="px-4 py-3 space-y-3 max-h-96 overflow-y-auto">
-        {editableItems.map((item, idx) => (
+      <div className="px-4 py-3 space-y-2 max-h-96 overflow-y-auto">
+        {flattenedItems.map((item) => (
           <div
-            key={idx}
+            key={item.uniqueId}
             className={`bg-white rounded-lg p-3 border-2 transition-all ${
-              selectedItems.has(idx)
+              selectedItems.has(item.uniqueId)
                 ? "border-rose-400 shadow-lg ring-2 ring-rose-200"
                 : "border-gray-200 shadow-sm hover:shadow-md"
             }`}
@@ -281,63 +379,58 @@ function ArrayObjectNode({
             <div className="flex items-center gap-2 mb-2">
               <input
                 type="checkbox"
-                checked={selectedItems.has(idx)}
+                checked={selectedItems.has(item.uniqueId)}
                 onChange={(e) => {
                   e.stopPropagation();
-                  toggleItemSelection(idx, e as any);
+                  toggleItemSelection(
+                    item.uniqueId,
+                    item.path,
+                    item.key,
+                    item.value,
+                  );
                 }}
                 onClick={(e) => e.stopPropagation()}
                 className="w-4 h-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500 cursor-pointer"
               />
               <span className="text-[10px] text-gray-400 font-medium">
-                Item {idx + 1}
+                {item.key}
               </span>
-              {selectedItems.has(idx) && (
+              {selectedItems.has(item.uniqueId) && (
                 <span className="text-[8px] px-1.5 py-0.5 bg-rose-100 text-rose-600 rounded-full ml-auto">
                   Selected
                 </span>
               )}
             </div>
-            <div className="space-y-2 pl-6">
-              {item.Key !== undefined && item.Value !== undefined ? (
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-mono text-gray-600 min-w-[100px] font-medium">
-                    {String(item.Key)}:
-                  </span>
-                  <input
-                    type="text"
-                    value={String(item.Value)}
-                    onChange={(e) => handleValueChange(idx, e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex-1 text-gray-900 font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
-                    placeholder="Enter value..."
-                  />
-                </div>
-              ) : (
-                Object.entries(item).map(([key, val]) => (
-                  <div key={key} className="flex items-center gap-2 text-sm">
-                    <span className="font-mono text-gray-600 min-w-[100px] font-medium">
-                      {key}:
-                    </span>
-                    <input
-                      type="text"
-                      value={String(val)}
-                      onChange={(e) => {
-                        const updatedItems = [...editableItems];
-                        updatedItems[idx] = {
-                          ...updatedItems[idx],
-                          [key]: e.target.value,
-                        };
-                        setEditableItems(updatedItems);
-                        data.items = updatedItems;
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1 text-gray-900 font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
-                      placeholder={`Enter ${key}...`}
-                    />
-                  </div>
-                ))
-              )}
+            <div className="pl-6">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-mono text-gray-600 min-w-[100px] font-medium">
+                  Value:
+                </span>
+                <input
+                  type="text"
+                  value={item.value}
+                  onChange={(e) => {
+                    handleValueChange(
+                      item.parentIndex,
+                      item.subIndex,
+                      item.key,
+                      e.target.value,
+                    );
+                    // Update the selected item's value if it's selected
+                    if (selectedItems.has(item.uniqueId)) {
+                      const newSelected = new Map(selectedItems);
+                      newSelected.set(item.uniqueId, {
+                        ...newSelected.get(item.uniqueId)!,
+                        value: e.target.value,
+                      });
+                      setSelectedItems(newSelected);
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 text-gray-900 font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                  placeholder="Enter value..."
+                />
+              </div>
             </div>
           </div>
         ))}
@@ -1052,7 +1145,7 @@ function WorkflowMindMapInner({
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const reactFlowInstance = useReactFlow();
   const [arraySelections, setArraySelections] = useState<
-    Map<string, Set<number>>
+    Map<string, Map<string, { path: string; key: string; value: string }>>
   >(new Map());
 
   interface ProcessedField {
@@ -1075,7 +1168,30 @@ function WorkflowMindMapInner({
       const currentPath = prefix ? `${prefix}.${key}` : key;
 
       if (Array.isArray(value)) {
-        const isKeyValueArray =
+        // Check if it's an array of objects with Sub_Fields (your response structure)
+        const hasSubFields =
+          value.length > 0 &&
+          value.some(
+            (item) =>
+              item &&
+              typeof item === "object" &&
+              !Array.isArray(item) &&
+              "Sub_Fields" in item,
+          );
+
+        if (hasSubFields) {
+          // This is an array with Sub_Fields - treat each Sub_Fields item separately
+          fields.push({
+            path: currentPath,
+            value: value,
+            type: "array-with-subfields",
+            isArray: true,
+            isKeyValueArray: false,
+            items: value as Array<Record<string, unknown>>,
+          });
+        }
+        // Check if it's an array of objects with Key/Value structure (standard)
+        else if (
           value.length > 0 &&
           value.every(
             (item) =>
@@ -1084,9 +1200,8 @@ function WorkflowMindMapInner({
               !Array.isArray(item) &&
               "Key" in item &&
               "Value" in item,
-          );
-
-        if (isKeyValueArray) {
+          )
+        ) {
           fields.push({
             path: currentPath,
             value: value,
@@ -1096,6 +1211,7 @@ function WorkflowMindMapInner({
             items: value as Array<Record<string, unknown>>,
           });
         } else {
+          // Regular array
           fields.push({
             path: currentPath,
             value: value,
@@ -1104,6 +1220,7 @@ function WorkflowMindMapInner({
             isKeyValueArray: false,
           });
 
+          // Process array items
           value.forEach((item, idx) => {
             if (item && typeof item === "object") {
               const itemFields = processFieldsWithArrays(
@@ -1124,12 +1241,14 @@ function WorkflowMindMapInner({
           });
         }
       } else if (value && typeof value === "object" && value !== null) {
+        // Nested object
         const nestedFields = processFieldsWithArrays(
           value as Record<string, unknown>,
           currentPath,
         );
         fields.push(...nestedFields);
       } else {
+        // Primitive value
         fields.push({
           path: currentPath,
           value: value,
@@ -1178,13 +1297,16 @@ function WorkflowMindMapInner({
   );
 
   const handleArraySelectionChange = useCallback(
-    (nodeId: string, selectedIndices: Set<number>) => {
+    (
+      nodeId: string,
+      selections: Map<string, { path: string; key: string; value: string }>,
+    ) => {
       setArraySelections((prev) => {
         const updated = new Map(prev);
-        if (selectedIndices.size === 0) {
+        if (selections.size === 0) {
           updated.delete(nodeId);
         } else {
-          updated.set(nodeId, selectedIndices);
+          updated.set(nodeId, selections);
         }
         return updated;
       });
@@ -1229,7 +1351,10 @@ function WorkflowMindMapInner({
       requestFields.forEach((field) => {
         const isOverride = overrideFields.includes(field.path);
 
-        if (field.isKeyValueArray && field.items) {
+        if (
+          (field.isKeyValueArray || field.type === "array-with-subfields") &&
+          field.items
+        ) {
           allNodes.push({
             id: `request-${field.path}`,
             type: "arrayObjectNode",
@@ -1246,7 +1371,7 @@ function WorkflowMindMapInner({
               category: "request",
               isOverride,
               selectedItems:
-                arraySelections.get(`request-${field.path}`) || new Set(),
+                arraySelections.get(`request-${field.path}`) || new Map(),
               onSelectionChange: handleArraySelectionChange,
             },
           });
@@ -1308,7 +1433,10 @@ function WorkflowMindMapInner({
       responseFields.forEach((field) => {
         const isMappedToContext = contextFields.includes(field.path);
 
-        if (field.isKeyValueArray && field.items) {
+        if (
+          (field.isKeyValueArray || field.type === "array-with-subfields") &&
+          field.items
+        ) {
           allNodes.push({
             id: `response-${field.path}`,
             type: "arrayObjectNode",
@@ -1325,6 +1453,9 @@ function WorkflowMindMapInner({
               category: "response",
               isMappedToContext,
               contextKey: isMappedToContext ? field.path : undefined,
+              selectedItems:
+                arraySelections.get(`response-${field.path}`) || new Map(),
+              onSelectionChange: handleArraySelectionChange,
             },
           });
           responseY += 200 + field.items.length * 30;
@@ -1550,11 +1681,14 @@ function WorkflowMindMapInner({
     setEditingOverrideField(null);
   }, []);
 
-  // Replace the handleToggleOverride function with this fixed version:
+  // Handle Mark Override button click
   const handleToggleOverride = useCallback(() => {
     // Get all array nodes that have selected items
     const arrayNodesWithSelections = Array.from(arraySelections.entries())
-      .filter(([_, selectedIndices]) => selectedIndices.size > 0)
+      .filter(([nodeId, selections]) => {
+        const node = nodes.find((n) => n.id === nodeId);
+        return node?.data?.category === "request" && selections.size > 0;
+      })
       .map(([nodeId]) => nodes.find((n) => n.id === nodeId))
       .filter(Boolean);
 
@@ -1566,6 +1700,7 @@ function WorkflowMindMapInner({
         n.type !== "arrayObjectNode",
     );
 
+    // If nothing is selected, show alert
     if (
       arrayNodesWithSelections.length === 0 &&
       regularSelectedNodes.length === 0
@@ -1577,40 +1712,30 @@ function WorkflowMindMapInner({
     }
 
     // Handle array nodes with selections
-    arrayNodesWithSelections.forEach((node) => {
-      if (!node) return;
+    if (arrayNodesWithSelections.length > 0) {
+      arrayNodesWithSelections.forEach((node) => {
+        if (!node) return;
 
-      const fieldKey = node.data.originalKey || node.data.key;
-      const selectedIndices = arraySelections.get(node.id) || new Set();
+        const selections = arraySelections.get(node.id) || new Map();
 
-      selectedIndices.forEach((index) => {
-        const item = node.data.items[index];
-        if (item && item.Key) {
-          const valuePath = `${fieldKey}[${index}].Value`;
-
-          // Create a field name from the Key
-          const fieldName = String(item.Key).toLowerCase().replace(/\s+/g, "_");
-
-          // Check if already exists
-          if (!overrideFieldConfigs.has(valuePath)) {
+        selections.forEach((item) => {
+          if (!overrideFieldConfigs.has(item.path)) {
             const defaultConfig: OverrideFieldConfig = {
-              field: fieldName,
-              value: `request.${valuePath}`,
-              actual_mapping: valuePath,
-              type: detectDataType(item.Value) || "string",
+              field: item.key.toLowerCase().replace(/\s+/g, "_"),
+              value: `request.${item.path}`,
+              actual_mapping: item.path,
+              type: detectDataType(item.value) || "string",
               required: true,
             };
 
-            // Add to override configs
             setOverrideFieldConfigs((prev) => {
               const updated = new Map(prev);
-              updated.set(valuePath, defaultConfig);
+              updated.set(item.path, defaultConfig);
               return updated;
             });
 
-            // Add edge from override collection to this array node
             const newEdge: Edge = {
-              id: `edge-override-${node.id}-${index}-${Date.now()}`,
+              id: `edge-override-${node.id}-${item.path}-${Date.now()}`,
               source: "override-collection",
               target: node.id,
               animated: true,
@@ -1621,7 +1746,7 @@ function WorkflowMindMapInner({
                 width: 20,
                 height: 20,
               },
-              label: `overrides ${fieldName} →`,
+              label: `overrides ${item.key} →`,
               labelStyle: { fill: "#f43f5e", fontWeight: 700, fontSize: 11 },
               labelBgStyle: { fill: "white", fillOpacity: 0.95 },
               labelBgPadding: [6, 4] as [number, number],
@@ -1629,65 +1754,63 @@ function WorkflowMindMapInner({
             };
             setEdges((eds) => [...eds, newEdge]);
           }
-        }
+        });
       });
-    });
+    }
 
     // Handle regular selected nodes
-    regularSelectedNodes.forEach((node) => {
-      const fieldKey = node.data.originalKey || node.data.key;
+    if (regularSelectedNodes.length > 0) {
+      regularSelectedNodes.forEach((node) => {
+        const fieldKey = node.data.originalKey || node.data.key;
 
-      if (overrideFieldConfigs.has(fieldKey)) {
-        // Remove from override
-        setOverrideFieldConfigs((prev) => {
-          const updated = new Map(prev);
-          updated.delete(fieldKey);
-          return updated;
-        });
-        // Remove edge
-        setEdges((eds) =>
-          eds.filter(
-            (e) => e.target !== node.id || e.source !== "override-collection",
-          ),
-        );
-      } else {
-        // Add to override
-        const defaultConfig: OverrideFieldConfig = {
-          field: fieldKey,
-          value: `request.${fieldKey}`,
-          actual_mapping: fieldKey,
-          type: node.data.type || "string",
-          required: true,
-        };
+        if (overrideFieldConfigs.has(fieldKey)) {
+          setOverrideFieldConfigs((prev) => {
+            const updated = new Map(prev);
+            updated.delete(fieldKey);
+            return updated;
+          });
+          setEdges((eds) =>
+            eds.filter(
+              (e) => e.target !== node.id || e.source !== "override-collection",
+            ),
+          );
+        } else {
+          const defaultConfig: OverrideFieldConfig = {
+            field: fieldKey,
+            value: `request.${fieldKey}`,
+            actual_mapping: fieldKey,
+            type: node.data.type || "string",
+            required: true,
+          };
 
-        setOverrideFieldConfigs((prev) => {
-          const updated = new Map(prev);
-          updated.set(fieldKey, defaultConfig);
-          return updated;
-        });
+          setOverrideFieldConfigs((prev) => {
+            const updated = new Map(prev);
+            updated.set(fieldKey, defaultConfig);
+            return updated;
+          });
 
-        // Add edge
-        const newEdge: Edge = {
-          id: `edge-override-${node.id}-${Date.now()}`,
-          source: "override-collection",
-          target: node.id,
-          animated: true,
-          style: { stroke: "#f43f5e", strokeWidth: 3 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "#f43f5e",
-            width: 20,
-            height: 20,
-          },
-          label: "overrides →",
-          labelStyle: { fill: "#f43f5e", fontWeight: 700, fontSize: 11 },
-          labelBgStyle: { fill: "white", fillOpacity: 0.95 },
-          labelBgPadding: [6, 4] as [number, number],
-          labelBgBorderRadius: 6,
-        };
-        setEdges((eds) => [...eds, newEdge]);
-      }
-    });
+          const newEdge: Edge = {
+            id: `edge-override-${node.id}-${Date.now()}`,
+            source: "override-collection",
+            target: node.id,
+            animated: true,
+            style: { stroke: "#f43f5e", strokeWidth: 3 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: "#f43f5e",
+              width: 20,
+              height: 20,
+            },
+            label: "overrides →",
+            labelStyle: { fill: "#f43f5e", fontWeight: 700, fontSize: 11 },
+            labelBgStyle: { fill: "white", fillOpacity: 0.95 },
+            labelBgPadding: [6, 4] as [number, number],
+            labelBgBorderRadius: 6,
+          };
+          setEdges((eds) => [...eds, newEdge]);
+        }
+      });
+    }
   }, [
     nodes,
     selectedNodes,
@@ -1697,59 +1820,130 @@ function WorkflowMindMapInner({
     setOverrideFieldConfigs,
   ]);
 
+  // Handle Store Context button click
   const handleToggleContext = useCallback(() => {
-    const selectedResponseNodes = nodes.filter(
-      (n) => selectedNodes.includes(n.id) && n.data?.category === "response",
+    // Get all array nodes that have selected items (for response arrays)
+    const arrayNodesWithSelections = Array.from(arraySelections.entries())
+      .filter(([nodeId, selections]) => {
+        const node = nodes.find((n) => n.id === nodeId);
+        return node?.data?.category === "response" && selections.size > 0;
+      })
+      .map(([nodeId]) => nodes.find((n) => n.id === nodeId))
+      .filter(Boolean);
+
+    // Get regular selected nodes (non-array response nodes)
+    const regularSelectedNodes = nodes.filter(
+      (n) =>
+        selectedNodes.includes(n.id) &&
+        n.data?.category === "response" &&
+        n.type !== "arrayObjectNode",
     );
 
-    if (selectedResponseNodes.length === 0) {
+    // If nothing is selected, show alert
+    if (
+      arrayNodesWithSelections.length === 0 &&
+      regularSelectedNodes.length === 0
+    ) {
       alert(
-        "No response nodes selected. Select response fields first, then click Store Context.",
+        "Please either:\n1. Check boxes in response array items, OR\n2. Select regular response fields",
       );
       return;
     }
 
-    selectedResponseNodes.forEach((node) => {
-      const fieldKey = node.data.originalKey || node.data.key;
-      if (contextFieldMappings.has(fieldKey)) {
-        setContextFieldMappings((prev) => {
-          const updated = new Map(prev);
-          updated.delete(fieldKey);
-          return updated;
+    // Handle array nodes with selections (response arrays)
+    if (arrayNodesWithSelections.length > 0) {
+      arrayNodesWithSelections.forEach((node) => {
+        if (!node) return;
+
+        const selections = arraySelections.get(node.id) || new Map();
+
+        selections.forEach((item) => {
+          if (!contextFieldMappings.has(item.path)) {
+            const displayName = item.key.toLowerCase().replace(/\s+/g, "_");
+
+            setContextFieldMappings((prev) => {
+              const updated = new Map(prev);
+              updated.set(item.path, displayName);
+              return updated;
+            });
+
+            const newEdge: Edge = {
+              id: `edge-${node.id}-${item.path}-context-${Date.now()}`,
+              source: node.id,
+              target: "context-storage",
+              animated: true,
+              style: { stroke: "#8b5cf6", strokeWidth: 3 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: "#8b5cf6",
+                width: 20,
+                height: 20,
+              },
+              label: `stores ${item.key} →`,
+              labelStyle: { fill: "#8b5cf6", fontWeight: 700, fontSize: 11 },
+              labelBgStyle: { fill: "white", fillOpacity: 0.95 },
+              labelBgPadding: [6, 4] as [number, number],
+              labelBgBorderRadius: 6,
+            };
+            setEdges((eds) => [...eds, newEdge]);
+          }
         });
-        setEdges((eds) =>
-          eds.filter(
-            (e) => e.source !== node.id || e.target !== "context-storage",
-          ),
-        );
-      } else {
-        setContextFieldMappings((prev) => {
-          const updated = new Map(prev);
-          updated.set(fieldKey, fieldKey);
-          return updated;
-        });
-        const newEdge: Edge = {
-          id: `edge-${node.id}-context-${Date.now()}`,
-          source: node.id,
-          target: "context-storage",
-          animated: true,
-          style: { stroke: "#8b5cf6", strokeWidth: 3 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "#8b5cf6",
-            width: 20,
-            height: 20,
-          },
-          label: "stores →",
-          labelStyle: { fill: "#8b5cf6", fontWeight: 700, fontSize: 11 },
-          labelBgStyle: { fill: "white", fillOpacity: 0.95 },
-          labelBgPadding: [6, 4] as [number, number],
-          labelBgBorderRadius: 6,
-        };
-        setEdges((eds) => [...eds, newEdge]);
-      }
-    });
-  }, [nodes, selectedNodes, contextFieldMappings, setEdges]);
+      });
+    }
+
+    // Handle regular selected nodes (non-array response fields)
+    if (regularSelectedNodes.length > 0) {
+      regularSelectedNodes.forEach((node) => {
+        const fieldKey = node.data.originalKey || node.data.key;
+
+        if (contextFieldMappings.has(fieldKey)) {
+          setContextFieldMappings((prev) => {
+            const updated = new Map(prev);
+            updated.delete(fieldKey);
+            return updated;
+          });
+          setEdges((eds) =>
+            eds.filter(
+              (e) => e.source !== node.id || e.target !== "context-storage",
+            ),
+          );
+        } else {
+          setContextFieldMappings((prev) => {
+            const updated = new Map(prev);
+            updated.set(fieldKey, fieldKey);
+            return updated;
+          });
+
+          const newEdge: Edge = {
+            id: `edge-${node.id}-context-${Date.now()}`,
+            source: node.id,
+            target: "context-storage",
+            animated: true,
+            style: { stroke: "#8b5cf6", strokeWidth: 3 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: "#8b5cf6",
+              width: 20,
+              height: 20,
+            },
+            label: "stores →",
+            labelStyle: { fill: "#8b5cf6", fontWeight: 700, fontSize: 11 },
+            labelBgStyle: { fill: "white", fillOpacity: 0.95 },
+            labelBgPadding: [6, 4] as [number, number],
+            labelBgBorderRadius: 6,
+          };
+          setEdges((eds) => [...eds, newEdge]);
+        }
+      });
+    }
+  }, [
+    nodes,
+    selectedNodes,
+    contextFieldMappings,
+    arraySelections,
+    setEdges,
+    setContextFieldMappings,
+  ]);
 
   const handleAutoLayout = useCallback(() => {
     const requestNodes = nodes.filter((n) => n.data?.category === "request");
@@ -1794,68 +1988,38 @@ function WorkflowMindMapInner({
       required: boolean;
     }> = [];
 
-    contextFieldMappings.forEach((displayName, originalKey) => {
-      responseMapper[originalKey] = displayName;
+    // Response mapper - store actual values from response fields
+    // For regular response fields
+    edges.forEach((edge) => {
+      if (edge.target === "context-storage") {
+        const sourceNode = nodes.find((n) => n.id === edge.source);
+        if (sourceNode && sourceNode.data?.category === "response") {
+          const fieldKey = sourceNode.data.originalKey || sourceNode.data.key;
+          const displayName = contextFieldMappings.get(fieldKey) || fieldKey;
+
+          // Get the actual value from the node data
+          const value = sourceNode.data.value;
+          responseMapper[displayName] =
+            value !== undefined ? String(value) : "";
+        }
+      }
     });
 
-    overrideFieldConfigs.forEach((config) => {
-      if (
-        config.actual_mapping.includes("[") &&
-        config.actual_mapping.includes("]")
-      ) {
-        const match = config.actual_mapping.match(/\[(\d+)\]\.(\w+)/);
-        if (match) {
-          const [, , key] = match;
-          const fieldName = key.toLowerCase().replace(/\s+/g, "_");
-
-          overriddenRequestBody.push({
-            field: fieldName,
-            value: `request.${config.actual_mapping}`,
-            actual_mapping: config.actual_mapping,
-            type: config.type,
-            required: config.required,
-            ...(config.max_length !== undefined && {
-              max_length: config.max_length,
-            }),
-            ...(config.min_length !== undefined && {
-              min_length: config.min_length,
-            }),
-            ...(config.pattern && { pattern: config.pattern }),
-          });
-        } else {
-          overriddenRequestBody.push({
-            field: config.field,
-            value: config.value,
-            actual_mapping: config.actual_mapping,
-            type: config.type,
-            required: config.required,
-            ...(config.max_length !== undefined && {
-              max_length: config.max_length,
-            }),
-            ...(config.min_length !== undefined && {
-              min_length: config.min_length,
-            }),
-            ...(config.pattern && { pattern: config.pattern }),
-          });
-        }
-      } else {
-        overriddenRequestBody.push({
-          field: config.field,
-          value: config.value,
-          actual_mapping: config.actual_mapping,
-          type: config.type,
-          required: config.required,
-          ...(config.max_length !== undefined && {
-            max_length: config.max_length,
-          }),
-          ...(config.min_length !== undefined && {
-            min_length: config.min_length,
-          }),
-          ...(config.pattern && { pattern: config.pattern }),
+    // For array response items (from selections)
+    arraySelections.forEach((selections, nodeId) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      if (node?.data?.category === "response") {
+        selections.forEach((item) => {
+          // Use the key as the field name
+          const fieldName = item.key.toLowerCase().replace(/\s+/g, "_");
+          // Store the actual value (not the path)
+          responseMapper[fieldName] = item.value;
         });
       }
     });
 
+    // Request mapper - store paths as values
+    // For regular request-response connections
     edges.forEach((edge) => {
       if (
         edge.source.startsWith("response-") &&
@@ -1864,13 +2028,53 @@ function WorkflowMindMapInner({
         const srcNode = nodes.find((n) => n.id === edge.source);
         const tgtNode = nodes.find((n) => n.id === edge.target);
         if (srcNode && tgtNode) {
-          const srcKey = srcNode.data.renamedTo || srcNode.data.originalKey;
           const tgtKey = tgtNode.data.renamedTo || tgtNode.data.originalKey;
-          requestMapper[tgtKey] = `accumulated.${srcKey}`;
+
+          // Get the source path
+          let sourcePath = srcNode.data.originalKey || srcNode.data.key;
+
+          // Format the path without brackets (using dots)
+          sourcePath = sourcePath.replace(/\[/g, ".").replace(/\]/g, "");
+
+          requestMapper[tgtKey] = sourcePath;
         }
       }
     });
 
+    // For array request items (from selections)
+    arraySelections.forEach((selections, nodeId) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      if (node?.data?.category === "request") {
+        selections.forEach((item) => {
+          // Format the path without brackets
+          const formattedPath = item.path
+            .replace(/\[/g, ".")
+            .replace(/\]/g, "");
+          requestMapper[item.key.toLowerCase().replace(/\s+/g, "_")] =
+            formattedPath;
+        });
+      }
+    });
+
+    // Override fields
+    overrideFieldConfigs.forEach((config) => {
+      overriddenRequestBody.push({
+        field: config.field,
+        value: config.value,
+        actual_mapping: config.actual_mapping,
+        type: config.type,
+        required: config.required,
+        ...(config.max_length !== undefined && {
+          max_length: config.max_length,
+        }),
+        ...(config.min_length !== undefined && {
+          min_length: config.min_length,
+        }),
+        ...(config.pattern && { pattern: config.pattern }),
+      });
+    });
+
+    // Build template structure
     const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
     const currentStepIdx = STEP_ORDER.indexOf(stepName || "");
     const nextStepName =
@@ -1888,14 +2092,17 @@ function WorkflowMindMapInner({
       ...(parsedRequest?.body && { body: parsedRequest.body }),
     };
 
+    // Add request_mapper if not empty
     if (Object.keys(requestMapper).length > 0) {
       template.request_mapper = requestMapper;
     }
 
+    // Add response_mapper if not empty
     if (Object.keys(responseMapper).length > 0) {
       template.response_mapper = responseMapper;
     }
 
+    // Add authorization_mapper if bearer token detected
     const authHeader =
       parsedRequest?.headers?.["Authorization"] ||
       parsedRequest?.headers?.["authorization"];
@@ -1906,27 +2113,45 @@ function WorkflowMindMapInner({
       };
     }
 
+    // Add to_be_overridden if not empty
     if (overriddenRequestBody.length > 0) {
       template.to_be_overridden = {
         overridden_request_body: overriddenRequestBody,
       };
     }
 
+    // Add static_fields if needed (fields that have hardcoded values)
     const staticFields: Record<string, string> = {};
-    Object.entries(requestMapper).forEach(([key, value]) => {
-      if (
-        !value.includes("{{") &&
-        !value.includes("accumulated.") &&
-        !value.includes("context.")
-      ) {
-        staticFields[key] = value;
-      }
-    });
+    if (parsedRequest?.body) {
+      Object.entries(parsedRequest.body).forEach(([key, value]) => {
+        if (
+          typeof value === "string" &&
+          !value.includes("{{") &&
+          !value.includes("accumulated.")
+        ) {
+          staticFields[key] = value;
+        }
+      });
+    }
 
     if (Object.keys(staticFields).length > 0) {
       template.static_fields = staticFields;
     }
 
+    // Add credentials for TOKEN step
+    if (stepName === "TOKEN" && parsedRequest?.body) {
+      const credentials: Record<string, string> = {};
+      Object.entries(parsedRequest.body).forEach(([key, value]) => {
+        if (typeof value === "string") {
+          credentials[key] = value;
+        }
+      });
+      if (Object.keys(credentials).length > 0) {
+        template.credentials = credentials;
+      }
+    }
+
+    // Remove undefined fields
     Object.keys(template).forEach((key) => {
       if (
         template[key] === undefined ||
@@ -1944,6 +2169,7 @@ function WorkflowMindMapInner({
     edges,
     contextFieldMappings,
     overrideFieldConfigs,
+    arraySelections,
     parsedRequest,
     stepName,
   ]);
