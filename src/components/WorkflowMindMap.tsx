@@ -775,7 +775,7 @@ function OverrideCollectionNode({
           {data.fields.map((field) => (
             <div
               key={field.actual_mapping}
-              className="group bg-white rounded-lg shadow-sm text-xs overflow-hidden"
+              className="group bg-white rounded-lg shadow-sm text-xs overflow-hidden hover:shadow-md transition-shadow"
             >
               <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
                 <Edit3 className="w-3 h-3 text-rose-500 flex-shrink-0" />
@@ -927,7 +927,7 @@ function OverrideFieldModal({
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800">
-            Configure Override Field
+            {field ? "Edit Override Field" : "Configure Override Field"}
           </h3>
           <button
             onClick={onClose}
@@ -1108,7 +1108,7 @@ function OverrideFieldModal({
               type="submit"
               className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-rose-500 to-pink-600 rounded-lg hover:from-rose-600 hover:to-pink-700"
             >
-              Save Configuration
+              {field ? "Update Configuration" : "Save Configuration"}
             </button>
           </div>
         </form>
@@ -1520,6 +1520,25 @@ function WorkflowMindMapInner({
           originalKey: k,
           displayName: v,
         })),
+        onFieldRename: (originalKey: string, newName: string) => {
+          setContextFieldMappings((prev) => {
+            const updated = new Map(prev);
+            updated.set(originalKey, newName);
+            return updated;
+          });
+        },
+        onFieldRemove: (originalKey: string) => {
+          setContextFieldMappings((prev) => {
+            const updated = new Map(prev);
+            updated.delete(originalKey);
+            return updated;
+          });
+          setEdges((eds) =>
+            eds.filter(
+              (e) => e.source !== `response-${originalKey}` || e.target !== "context-storage",
+            ),
+          );
+        },
       },
     });
 
@@ -1530,6 +1549,22 @@ function WorkflowMindMapInner({
       data: {
         label: "Override Fields",
         fields: Array.from(overrideFieldConfigs.values()),
+        onFieldEdit: (field: OverrideFieldConfig) => {
+          setEditingOverrideField(field);
+          setShowOverrideModal(true);
+        },
+        onFieldRemove: (actualMapping: string) => {
+          setOverrideFieldConfigs((prev) => {
+            const updated = new Map(prev);
+            updated.delete(actualMapping);
+            return updated;
+          });
+          setEdges((eds) =>
+            eds.filter(
+              (e) => e.source !== "override-collection" || e.target !== `request-${actualMapping}`,
+            ),
+          );
+        },
       },
     });
 
@@ -1711,50 +1746,26 @@ function WorkflowMindMapInner({
       return;
     }
 
-    // Handle array nodes with selections
+    // Handle array nodes with selections - show modal for first selected item
     if (arrayNodesWithSelections.length > 0) {
       arrayNodesWithSelections.forEach((node) => {
         if (!node) return;
 
         const selections = arraySelections.get(node.id) || new Map();
-
-        selections.forEach((item) => {
-          if (!overrideFieldConfigs.has(item.path)) {
-            const defaultConfig: OverrideFieldConfig = {
-              field: item.key.toLowerCase().replace(/\s+/g, "_"),
-              value: `request.${item.path}`,
-              actual_mapping: item.path,
-              type: detectDataType(item.value) || "string",
-              required: true,
-            };
-
-            setOverrideFieldConfigs((prev) => {
-              const updated = new Map(prev);
-              updated.set(item.path, defaultConfig);
-              return updated;
-            });
-
-            const newEdge: Edge = {
-              id: `edge-override-${node.id}-${item.path}-${Date.now()}`,
-              source: "override-collection",
-              target: node.id,
-              animated: true,
-              style: { stroke: "#f43f5e", strokeWidth: 3 },
-              markerEnd: {
-                type: MarkerType.ArrowClosed,
-                color: "#f43f5e",
-                width: 20,
-                height: 20,
-              },
-              label: `overrides ${item.key} →`,
-              labelStyle: { fill: "#f43f5e", fontWeight: 700, fontSize: 11 },
-              labelBgStyle: { fill: "white", fillOpacity: 0.95 },
-              labelBgPadding: [6, 4] as [number, number],
-              labelBgBorderRadius: 6,
-            };
-            setEdges((eds) => [...eds, newEdge]);
-          }
-        });
+        
+        // Show modal for the first selected item
+        const firstItem = Array.from(selections.values())[0];
+        if (firstItem) {
+          const defaultConfig: OverrideFieldConfig = {
+            field: firstItem.key.toLowerCase().replace(/\s+/g, "_"),
+            value: `request.${firstItem.path}`,
+            actual_mapping: firstItem.path,
+            type: detectDataType(firstItem.value) || "string",
+            required: true,
+          };
+          setEditingOverrideField(defaultConfig);
+          setShowOverrideModal(true);
+        }
       });
     }
 
@@ -1764,17 +1775,14 @@ function WorkflowMindMapInner({
         const fieldKey = node.data.originalKey || node.data.key;
 
         if (overrideFieldConfigs.has(fieldKey)) {
-          setOverrideFieldConfigs((prev) => {
-            const updated = new Map(prev);
-            updated.delete(fieldKey);
-            return updated;
-          });
-          setEdges((eds) =>
-            eds.filter(
-              (e) => e.target !== node.id || e.source !== "override-collection",
-            ),
-          );
+          // Edit existing override
+          const existingConfig = overrideFieldConfigs.get(fieldKey);
+          if (existingConfig) {
+            setEditingOverrideField(existingConfig);
+            setShowOverrideModal(true);
+          }
         } else {
+          // Create new override
           const defaultConfig: OverrideFieldConfig = {
             field: fieldKey,
             value: `request.${fieldKey}`,
@@ -1782,32 +1790,8 @@ function WorkflowMindMapInner({
             type: node.data.type || "string",
             required: true,
           };
-
-          setOverrideFieldConfigs((prev) => {
-            const updated = new Map(prev);
-            updated.set(fieldKey, defaultConfig);
-            return updated;
-          });
-
-          const newEdge: Edge = {
-            id: `edge-override-${node.id}-${Date.now()}`,
-            source: "override-collection",
-            target: node.id,
-            animated: true,
-            style: { stroke: "#f43f5e", strokeWidth: 3 },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color: "#f43f5e",
-              width: 20,
-              height: 20,
-            },
-            label: "overrides →",
-            labelStyle: { fill: "#f43f5e", fontWeight: 700, fontSize: 11 },
-            labelBgStyle: { fill: "white", fillOpacity: 0.95 },
-            labelBgPadding: [6, 4] as [number, number],
-            labelBgBorderRadius: 6,
-          };
-          setEdges((eds) => [...eds, newEdge]);
+          setEditingOverrideField(defaultConfig);
+          setShowOverrideModal(true);
         }
       });
     }
@@ -1816,8 +1800,6 @@ function WorkflowMindMapInner({
     selectedNodes,
     overrideFieldConfigs,
     arraySelections,
-    setEdges,
-    setOverrideFieldConfigs,
   ]);
 
   // Handle Store Context button click
@@ -2072,6 +2054,12 @@ function WorkflowMindMapInner({
         }),
         ...(config.pattern && { pattern: config.pattern }),
       });
+
+      // Add to request mapper as well
+      const formattedPath = config.actual_mapping
+        .replace(/\[/g, ".")
+        .replace(/\]/g, "");
+      requestMapper[config.field] = formattedPath;
     });
 
     // Build template structure
@@ -2118,13 +2106,6 @@ function WorkflowMindMapInner({
       template.to_be_overridden = {
         overridden_request_body: overriddenRequestBody,
       };
-      overriddenRequestBody.forEach((item) => {
-        // Format the actual_mapping to use dots instead of brackets
-        const formattedPath = item.actual_mapping
-          .replace(/\[/g, ".")
-          .replace(/\]/g, "");
-        requestMapper[item.field] = formattedPath;
-      });
     }
 
     // Add static_fields if needed (fields that have hardcoded values)
