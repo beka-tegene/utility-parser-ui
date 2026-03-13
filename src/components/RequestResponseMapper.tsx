@@ -876,6 +876,18 @@ export function RequestResponseMapper() {
       template.to_be_overridden = {
         overridden_request_body: overriddenRequestBody,
       };
+
+      // Add override fields to request_mapper
+      overriddenRequestBody.forEach((item) => {
+        // Format the actual_mapping to use dots instead of brackets
+        const formattedPath = item.actual_mapping
+          .replace(/\[/g, ".")
+          .replace(/\]/g, "");
+        requestMapper[item.field] = formattedPath;
+      });
+    }
+    if (Object.keys(requestMapper).length > 0) {
+      template.request_mapper = requestMapper;
     }
 
     // Remove undefined fields

@@ -2118,6 +2118,13 @@ function WorkflowMindMapInner({
       template.to_be_overridden = {
         overridden_request_body: overriddenRequestBody,
       };
+      overriddenRequestBody.forEach((item) => {
+        // Format the actual_mapping to use dots instead of brackets
+        const formattedPath = item.actual_mapping
+          .replace(/\[/g, ".")
+          .replace(/\]/g, "");
+        requestMapper[item.field] = formattedPath;
+      });
     }
 
     // Add static_fields if needed (fields that have hardcoded values)
