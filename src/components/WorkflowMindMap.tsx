@@ -30,8 +30,6 @@ import {
   InheritedFieldNode,
 } from "./ContextTimelineNode";
 import {
-  Plus,
-  Trash2,
   RefreshCw,
   Maximize2,
   Download,
@@ -41,7 +39,6 @@ import {
   Check,
   Edit3,
   X,
-  Link,
   GitBranch,
   Tag,
   Database,
@@ -50,7 +47,6 @@ import {
   Layers,
   LayoutGrid,
   Focus,
-  ChevronDown,
 } from "lucide-react";
 
 // Layout modes
@@ -71,6 +67,24 @@ interface FieldData {
   contextKey?: string;
   renamedTo?: string;
   mappedFrom?: string;
+  isArray?: boolean;
+  isArrayItem?: boolean;
+  arrayPath?: string;
+}
+
+interface ArrayObjectNodeData {
+  id: string;
+  key: string;
+  originalKey: string;
+  items: Array<Record<string, unknown>>;
+  type: string;
+  category: FieldCategory;
+  isOverride?: boolean;
+  isMappedToContext?: boolean;
+  contextKey?: string;
+  renamedTo?: string;
+  selectedItems?: Set<number>;
+  onSelectionChange?: (nodeId: string, selectedIndices: Set<number>) => void;
 }
 
 // ============ Colors ============
@@ -119,6 +133,229 @@ const categoryColors: Record<
   },
 };
 
+// ============ Array Object Node ============
+function ArrayObjectNode({
+  data,
+  selected,
+  id,
+}: NodeProps<ArrayObjectNodeData>) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editKey, setEditKey] = useState(data.renamedTo || data.key);
+  const [editableItems, setEditableItems] = useState(data.items);
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(
+    data.selectedItems || new Set(),
+  );
+
+  useEffect(() => {
+    setEditableItems(data.items);
+  }, [data.items]);
+
+  useEffect(() => {
+    if (data.onSelectionChange) {
+      data.onSelectionChange(id, selectedItems);
+    }
+  }, [selectedItems, id, data.onSelectionChange]);
+
+  const handleRename = () => {
+    if (editKey.trim() && editKey !== data.key) {
+      data.renamedTo = editKey;
+    }
+    setIsEditing(false);
+  };
+
+  const handleValueChange = (itemIndex: number, newValue: string) => {
+    const updatedItems = [...editableItems];
+    if (updatedItems[itemIndex] && "Value" in updatedItems[itemIndex]) {
+      updatedItems[itemIndex] = {
+        ...updatedItems[itemIndex],
+        Value: newValue,
+      };
+      setEditableItems(updatedItems);
+      data.items = updatedItems;
+    }
+  };
+
+  const toggleItemSelection = (itemIndex: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(itemIndex)) {
+      newSelected.delete(itemIndex);
+    } else {
+      newSelected.add(itemIndex);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const displayCategory = data.isOverride
+    ? "override"
+    : data.isMappedToContext
+      ? "context"
+      : data.category;
+  const colors =
+    categoryColors[displayCategory] || categoryColors[data.category];
+
+  return (
+    <div
+      className={`group relative rounded-xl border-2 shadow-lg transition-all duration-200 cursor-grab active:cursor-grabbing backdrop-blur-sm
+        ${colors.light} ${colors.border}
+        ${selected ? "ring-2 ring-purple-500 ring-offset-2 shadow-xl scale-105" : ""}
+        ${data.isOverride ? "ring-2 ring-rose-400 ring-offset-1" : ""}
+        ${data.isMappedToContext ? "ring-2 ring-violet-400 ring-offset-1" : ""}
+        hover:shadow-xl hover:scale-[1.02]`}
+      style={{ minWidth: 400, maxWidth: 500 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-4 !h-4 !bg-white !border-2 !shadow-md transition-transform hover:scale-125"
+        style={{ borderColor: colors.handle, left: -8 }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-4 !h-4 !bg-white !border-2 !shadow-md transition-transform hover:scale-125"
+        style={{ borderColor: colors.handle, right: -8 }}
+      />
+
+      {data.isOverride && (
+        <div className="absolute -top-3 -right-2 px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-full shadow-lg flex items-center gap-1 z-10">
+          <Edit3 className="w-2.5 h-2.5" />
+          OVERRIDE
+        </div>
+      )}
+
+      {data.isMappedToContext && !data.isOverride && (
+        <div className="absolute -top-3 -right-2 px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-full shadow-lg flex items-center gap-1 z-10">
+          <Database className="w-2.5 h-2.5" />
+          CONTEXT
+        </div>
+      )}
+
+      <div className="absolute -top-3 -left-2 px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full shadow-lg flex items-center gap-1 z-10">
+        <Layers className="w-2.5 h-2.5" />
+        ARRAY
+      </div>
+
+      <div
+        className={`px-4 py-3 bg-gradient-to-r ${colors.gradient} rounded-t-lg`}
+      >
+        <div className="flex items-center justify-between">
+          {isEditing ? (
+            <input
+              type="text"
+              value={editKey}
+              onChange={(e) => setEditKey(e.target.value)}
+              onBlur={handleRename}
+              onKeyDown={(e) => e.key === "Enter" && handleRename()}
+              className="flex-1 text-sm font-semibold bg-white border-2 border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:border-purple-500"
+              autoFocus
+            />
+          ) : (
+            <div className="flex items-center gap-2 w-full">
+              <span
+                className="text-sm font-bold text-white cursor-text hover:text-purple-200"
+                onDoubleClick={() => setIsEditing(true)}
+                title="Double-click to rename"
+              >
+                {data.renamedTo || data.key}
+              </span>
+              <span className="text-[10px] px-2 py-0.5 bg-white/20 rounded-full text-white font-medium ml-auto">
+                {editableItems.length} items ({selectedItems.size} selected)
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 py-3 space-y-3 max-h-96 overflow-y-auto">
+        {editableItems.map((item, idx) => (
+          <div
+            key={idx}
+            className={`bg-white rounded-lg p-3 border-2 transition-all ${
+              selectedItems.has(idx)
+                ? "border-rose-400 shadow-lg ring-2 ring-rose-200"
+                : "border-gray-200 shadow-sm hover:shadow-md"
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="checkbox"
+                checked={selectedItems.has(idx)}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  toggleItemSelection(idx, e as any);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-4 h-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500 cursor-pointer"
+              />
+              <span className="text-[10px] text-gray-400 font-medium">
+                Item {idx + 1}
+              </span>
+              {selectedItems.has(idx) && (
+                <span className="text-[8px] px-1.5 py-0.5 bg-rose-100 text-rose-600 rounded-full ml-auto">
+                  Selected
+                </span>
+              )}
+            </div>
+            <div className="space-y-2 pl-6">
+              {item.Key !== undefined && item.Value !== undefined ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-mono text-gray-600 min-w-[100px] font-medium">
+                    {String(item.Key)}:
+                  </span>
+                  <input
+                    type="text"
+                    value={String(item.Value)}
+                    onChange={(e) => handleValueChange(idx, e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-gray-900 font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    placeholder="Enter value..."
+                  />
+                </div>
+              ) : (
+                Object.entries(item).map(([key, val]) => (
+                  <div key={key} className="flex items-center gap-2 text-sm">
+                    <span className="font-mono text-gray-600 min-w-[100px] font-medium">
+                      {key}:
+                    </span>
+                    <input
+                      type="text"
+                      value={String(val)}
+                      onChange={(e) => {
+                        const updatedItems = [...editableItems];
+                        updatedItems[idx] = {
+                          ...updatedItems[idx],
+                          [key]: e.target.value,
+                        };
+                        setEditableItems(updatedItems);
+                        data.items = updatedItems;
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 text-gray-900 font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                      placeholder={`Enter ${key}...`}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="absolute -bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+        <button
+          onClick={() => setIsEditing(true)}
+          className="p-1.5 bg-white rounded-full shadow-lg hover:bg-violet-100 text-violet-600 border border-violet-200"
+          title="Rename array"
+        >
+          <Tag className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ============ Field Node ============
 function FieldNode({ data, selected }: NodeProps<FieldData>) {
   const [isEditing, setIsEditing] = useState(false);
@@ -149,7 +386,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
         hover:shadow-xl hover:scale-[1.02]`}
       style={{ minWidth: 200, maxWidth: 280 }}
     >
-      {/* Handles */}
       <Handle
         type="target"
         position={Position.Left}
@@ -163,7 +399,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
         style={{ borderColor: displayColors.handle, right: -8 }}
       />
 
-      {/* Override Badge */}
       {data.isOverride && (
         <div className="absolute -top-3 -right-2 px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-full shadow-lg flex items-center gap-1 z-10">
           <Edit3 className="w-2.5 h-2.5" />
@@ -171,7 +406,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
         </div>
       )}
 
-      {/* Context Storage Badge */}
       {data.isMappedToContext && !data.isOverride && (
         <div className="absolute -top-3 -right-2 px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-full shadow-lg flex items-center gap-1 z-10">
           <Database className="w-2.5 h-2.5" />
@@ -179,7 +413,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
         </div>
       )}
 
-      {/* Renamed Badge */}
       {data.renamedTo && data.renamedTo !== data.originalKey && (
         <div className="absolute -top-3 left-2 px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg flex items-center gap-1 z-10">
           <Tag className="w-2.5 h-2.5" />
@@ -187,7 +420,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
         </div>
       )}
 
-      {/* Header */}
       <div
         className={`px-3 py-2 bg-gradient-to-r ${displayColors.gradient} rounded-t-lg`}
       >
@@ -201,7 +433,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
         </div>
       </div>
 
-      {/* Content */}
       <div className="px-3 py-3">
         {isEditing ? (
           <div className="flex gap-1">
@@ -225,7 +456,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
           </div>
         )}
 
-        {/* Original key if renamed */}
         {data.renamedTo && data.renamedTo !== data.originalKey && (
           <div className="text-[10px] text-gray-400 font-mono mt-1 flex items-center gap-1">
             <ArrowRight className="w-2.5 h-2.5" />
@@ -233,7 +463,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
           </div>
         )}
 
-        {/* Context key if mapped */}
         {data.contextKey && (
           <div className="text-[10px] text-violet-600 font-mono mt-1 flex items-center gap-1 bg-violet-50 px-1.5 py-0.5 rounded">
             <Database className="w-2.5 h-2.5" />
@@ -241,7 +470,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
           </div>
         )}
 
-        {/* Value preview */}
         {data.value !== undefined && data.value !== "" && (
           <div className="text-[11px] text-gray-500 font-mono mt-2 truncate bg-white/70 px-2 py-1 rounded border border-gray-200">
             {String(data.value).slice(0, 35)}
@@ -250,7 +478,6 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
         )}
       </div>
 
-      {/* Quick Actions */}
       <div className="absolute -bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
         <button
           onClick={() => setIsEditing(true)}
@@ -264,13 +491,12 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
   );
 }
 
-// ============ Context Storage Field Mapping ============
+// ============ Context Storage Node ============
 interface ContextFieldMapping {
   originalKey: string;
   displayName: string;
 }
 
-// ============ Context Storage Node ============
 interface ContextStorageNodeData {
   fields: ContextFieldMapping[];
   label: string;
@@ -302,7 +528,6 @@ function ContextStorageNode({ data }: NodeProps<ContextStorageNodeData>) {
 
   return (
     <div className="relative px-6 py-4 bg-gradient-to-br from-violet-50 to-purple-100 rounded-2xl border-2 border-dashed border-violet-400 shadow-xl min-w-[250px]">
-      {/* Left handle for connections from left side */}
       <Handle
         type="target"
         position={Position.Left}
@@ -310,7 +535,6 @@ function ContextStorageNode({ data }: NodeProps<ContextStorageNodeData>) {
         className="!w-5 !h-5 !bg-violet-500 !border-3 !border-white !shadow-lg"
         style={{ left: -10 }}
       />
-      {/* Right handle for connections from right side (response fields) */}
       <Handle
         type="target"
         position={Position.Right}
@@ -413,10 +637,6 @@ function ContextStorageNode({ data }: NodeProps<ContextStorageNodeData>) {
   );
 }
 
-// ============ Override Field Configuration ============
-// OverrideFieldConfig imported from @/types
-export type { OverrideFieldConfig } from "@/types";
-
 // ============ Override Collection Node ============
 interface OverrideCollectionNodeData {
   fields: OverrideFieldConfig[];
@@ -430,7 +650,6 @@ function OverrideCollectionNode({
 }: NodeProps<OverrideCollectionNodeData>) {
   return (
     <div className="relative px-6 py-4 bg-gradient-to-br from-rose-50 to-pink-100 rounded-2xl border-2 border-dashed border-rose-400 shadow-xl min-w-[280px]">
-      {/* Left handle for connections to request fields */}
       <Handle
         type="source"
         position={Position.Left}
@@ -438,7 +657,6 @@ function OverrideCollectionNode({
         className="!w-5 !h-5 !bg-rose-500 !border-3 !border-white !shadow-lg"
         style={{ left: -10 }}
       />
-      {/* Right handle for other connections */}
       <Handle
         type="source"
         position={Position.Right}
@@ -539,30 +757,12 @@ function OverrideCollectionNode({
 
 const nodeTypes = {
   fieldNode: FieldNode,
+  arrayObjectNode: ArrayObjectNode,
   contextStorage: ContextStorageNode,
   overrideCollection: OverrideCollectionNode,
   contextTimeline: ContextTimelineNode,
   stepIndicator: StepIndicatorNode,
   inheritedField: InheritedFieldNode,
-};
-
-// Inheritance edge styling
-const inheritanceEdgeStyle = {
-  stroke: "#8b5cf6",
-  strokeWidth: 2,
-  strokeDasharray: "8,4",
-};
-
-// Context edge styling (animated)
-const contextEdgeStyle = {
-  stroke: "#8b5cf6",
-  strokeWidth: 3,
-};
-
-// Override edge styling
-const overrideEdgeStyle = {
-  stroke: "#f43f5e",
-  strokeWidth: 3,
 };
 
 // ============ Main Component ============
@@ -574,17 +774,9 @@ interface WorkflowMindMapProps {
     body: Record<string, unknown> | null;
   };
   parsedResponse?: Record<string, unknown> | null;
-  onConfigChange?: (config: {
-    response_mapper: Record<string, string>;
-    request_mapper: Record<string, string>;
-    to_be_overridden: Array<{ field: string; type: string; required: boolean }>;
-    context_fields: string[];
-  }) => void;
-  // Multi-step props
   stepName?: string;
   stepIndex?: number;
   inheritedContext?: Record<string, unknown>;
-  // Canvas state persistence
   initialContextMappings?: Record<string, string>;
   initialOverrideConfigs?: Record<string, OverrideFieldConfig>;
   onCanvasStateChange?: (state: {
@@ -653,7 +845,6 @@ function OverrideFieldModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Field (display name / context name) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Field Name (Context Key)
@@ -673,7 +864,6 @@ function OverrideFieldModal({
             </p>
           </div>
 
-          {/* Actual Mapping */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Actual Mapping (Request Body Field)
@@ -693,7 +883,6 @@ function OverrideFieldModal({
             </p>
           </div>
 
-          {/* Value (auto-generated) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Value
@@ -709,7 +898,6 @@ function OverrideFieldModal({
             </p>
           </div>
 
-          {/* Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Type
@@ -731,7 +919,6 @@ function OverrideFieldModal({
             </select>
           </div>
 
-          {/* Min/Max Length */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -775,7 +962,6 @@ function OverrideFieldModal({
             </div>
           </div>
 
-          {/* Pattern */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Pattern
@@ -799,7 +985,6 @@ function OverrideFieldModal({
             </select>
           </div>
 
-          {/* Required */}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -818,7 +1003,6 @@ function OverrideFieldModal({
             </label>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t">
             <button
               type="button"
@@ -843,7 +1027,6 @@ function OverrideFieldModal({
 function WorkflowMindMapInner({
   parsedRequest,
   parsedResponse,
-  onConfigChange,
   stepName,
   stepIndex = 0,
   inheritedContext = {},
@@ -853,95 +1036,106 @@ function WorkflowMindMapInner({
 }: WorkflowMindMapProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  // Context fields with custom display names (originalKey -> displayName)
   const [contextFieldMappings, setContextFieldMappings] = useState<
     Map<string, string>
   >(() => new Map(Object.entries(initialContextMappings)));
-  // Override fields with full configuration
   const [overrideFieldConfigs, setOverrideFieldConfigs] = useState<
     Map<string, OverrideFieldConfig>
   >(() => new Map(Object.entries(initialOverrideConfigs)));
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("vertical");
-  const [showStepOverview, setShowStepOverview] = useState(true);
+  const [showStepOverview] = useState(true);
   const [showContextPanel, setShowContextPanel] = useState(true);
   const [editingOverrideField, setEditingOverrideField] =
     useState<OverrideFieldConfig | null>(null);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const reactFlowInstance = useReactFlow();
+  const [arraySelections, setArraySelections] = useState<
+    Map<string, Set<number>>
+  >(new Map());
 
-  // Add these helper functions before the WorkflowMindMapInner component
-
-  // Enhanced field processing to handle arrays
   interface ProcessedField {
     path: string;
     value: unknown;
     type: string;
     isArray: boolean;
     arrayIndex?: number;
-    arrayItem?: Record<string, unknown>;
+    isKeyValueArray?: boolean;
+    items?: Array<Record<string, unknown>>;
   }
 
   function processFieldsWithArrays(
     obj: Record<string, unknown>,
     prefix = "",
-    arrayIndex?: number,
   ): ProcessedField[] {
     const fields: ProcessedField[] = [];
 
     Object.entries(obj).forEach(([key, value]) => {
-      // Handle array notation in path
-      const currentPath = prefix
-        ? arrayIndex !== undefined
-          ? `${prefix}[${arrayIndex}].${key}`
-          : `${prefix}.${key}`
-        : key;
+      const currentPath = prefix ? `${prefix}.${key}` : key;
 
       if (Array.isArray(value)) {
-        // It's an array - process each item
-        fields.push({
-          path: currentPath,
-          value: value,
-          type: "array",
-          isArray: true,
-        });
+        const isKeyValueArray =
+          value.length > 0 &&
+          value.every(
+            (item) =>
+              item &&
+              typeof item === "object" &&
+              !Array.isArray(item) &&
+              "Key" in item &&
+              "Value" in item,
+          );
 
-        // Process array items with indices
-        value.forEach((item, idx) => {
-          if (item && typeof item === "object") {
-            // Recursively process each array item's properties
-            const itemFields = processFieldsWithArrays(
-              item as Record<string, unknown>,
-              currentPath,
-              idx,
-            );
-            fields.push(...itemFields);
-          } else {
-            // Primitive array item
-            fields.push({
-              path: `${currentPath}[${idx}]`,
-              value: item,
-              type: detectDataType(item),
-              isArray: true,
-              arrayIndex: idx,
-            });
-          }
-        });
+        if (isKeyValueArray) {
+          fields.push({
+            path: currentPath,
+            value: value,
+            type: "keyvalue-array",
+            isArray: true,
+            isKeyValueArray: true,
+            items: value as Array<Record<string, unknown>>,
+          });
+        } else {
+          fields.push({
+            path: currentPath,
+            value: value,
+            type: "array",
+            isArray: true,
+            isKeyValueArray: false,
+          });
+
+          value.forEach((item, idx) => {
+            if (item && typeof item === "object") {
+              const itemFields = processFieldsWithArrays(
+                item as Record<string, unknown>,
+                `${currentPath}[${idx}]`,
+              );
+              fields.push(...itemFields);
+            } else {
+              fields.push({
+                path: `${currentPath}[${idx}]`,
+                value: item,
+                type: detectDataType(item),
+                isArray: true,
+                arrayIndex: idx,
+                isKeyValueArray: false,
+              });
+            }
+          });
+        }
       } else if (value && typeof value === "object" && value !== null) {
-        // It's a nested object - process recursively
         const nestedFields = processFieldsWithArrays(
           value as Record<string, unknown>,
           currentPath,
         );
         fields.push(...nestedFields);
       } else {
-        // It's a primitive value
         fields.push({
           path: currentPath,
           value: value,
           type: detectDataType(value),
           isArray: false,
+          isKeyValueArray: false,
         });
       }
     });
@@ -949,27 +1143,16 @@ function WorkflowMindMapInner({
     return fields;
   }
 
-  // Helper to format array path for display
-  function formatArrayPath(path: string): string {
-    return path.replace(/\[(\d+)\]/g, "[$1]");
-  }
-
-  // Helper to get base path without array indices
-  function getBaseArrayPath(path: string): string {
-    return path.replace(/\[\d+\]/g, "[]");
-  }
-  // Helper to get context fields as array (for backward compatibility)
   const contextFields = useMemo(
     () => Array.from(contextFieldMappings.keys()),
     [contextFieldMappings],
   );
-  // Helper to get override fields as array (for backward compatibility)
+
   const overrideFields = useMemo(
     () => Array.from(overrideFieldConfigs.keys()),
     [overrideFieldConfigs],
   );
 
-  // Inherited fields from previous steps
   const inheritedFields = useMemo(() => {
     return Object.entries(inheritedContext).map(([key, value]) => ({
       key,
@@ -978,7 +1161,6 @@ function WorkflowMindMapInner({
     }));
   }, [inheritedContext]);
 
-  // Persist canvas state changes
   useEffect(() => {
     if (onCanvasStateChange) {
       onCanvasStateChange({
@@ -988,7 +1170,6 @@ function WorkflowMindMapInner({
     }
   }, [contextFieldMappings, overrideFieldConfigs, onCanvasStateChange]);
 
-  // Track selected nodes
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodesList }: { nodes: Node[] }) => {
       setSelectedNodes(selectedNodesList.map((n) => n.id));
@@ -996,49 +1177,37 @@ function WorkflowMindMapInner({
     [],
   );
 
-  // Build nodes from data
+  const handleArraySelectionChange = useCallback(
+    (nodeId: string, selectedIndices: Set<number>) => {
+      setArraySelections((prev) => {
+        const updated = new Map(prev);
+        if (selectedIndices.size === 0) {
+          updated.delete(nodeId);
+        } else {
+          updated.set(nodeId, selectedIndices);
+        }
+        return updated;
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     const allNodes: Node[] = [];
     const allEdges: Edge[] = [];
-    let inheritedY = 50;
     let requestY = 100;
     let responseY = 100;
 
-    // Layout positions based on mode
-    const getPositions = () => {
-      if (layoutMode === "horizontal") {
-        return {
-          inherited: { x: 50, startY: 50 },
-          request: { x: 350, startY: 50 },
-          response: { x: 650, startY: 50 },
-          contextStorage: { x: 950, y: 50 },
-          overrideCollection: { x: 950, y: 350 },
-        };
-      }
-      return {
-        inherited: { x: 50, startY: 50 },
-        request: {
-          x: 50,
-          startY:
-            inheritedFields.length > 0
-              ? inheritedFields.length * 100 + 80
-              : 100,
-        },
-        response: { x: 700, startY: 100 },
-        contextStorage: { x: 400, y: 50 },
-        overrideCollection: { x: 400, y: 350 },
-      };
+    const positions = {
+      request: { x: 50 },
+      response: { x: 700 },
     };
 
-    const positions = getPositions();
-
-    // Step indicator node
     if (stepName) {
       allNodes.push({
         id: "step-indicator",
         type: "stepIndicator",
         position: { x: 350, y: 10 },
-        draggable: true,
         data: {
           stepName,
           stepIndex,
@@ -1052,167 +1221,157 @@ function WorkflowMindMapInner({
       });
     }
 
-    // Inherited field nodes (from previous steps)
-    if (inheritedFields.length > 0) {
-      inheritedFields.forEach((field, idx) => {
-        const nodeId = `inherited-${field.key}`;
-        allNodes.push({
-          id: nodeId,
-          type: "inheritedField",
-          position: {
-            x: positions.inherited.x,
-            y: positions.inherited.startY + idx * 90,
-          },
-          draggable: true,
-          data: {
-            fieldKey: field.key,
-            value: field.value,
-            fromStep:
-              stepIndex > 0
-                ? ["TOKEN", "QUERY", "SETUP", "PAYMENT"][stepIndex - 1]
-                : "UNKNOWN",
-            fromStepIndex: stepIndex - 1,
-            dataType: field.type,
-          },
-        });
-      });
-
-      // Adjust request start position
-      requestY = positions.request.startY;
-    }
-
-    // Request fields (left column)
-    // In the useEffect that builds nodes, replace the request and response field processing sections:
-
-    // Request fields (left column) - Enhanced with array support
     if (parsedRequest?.body && typeof parsedRequest.body === "object") {
       const requestFields = processFieldsWithArrays(
         parsedRequest.body as Record<string, unknown>,
       );
 
-      // First add array container nodes for better visualization
-      const arrayContainers = new Set<string>();
       requestFields.forEach((field) => {
-        if (field.isArray && !field.arrayIndex) {
-          // This is an array container itself
-          arrayContainers.add(field.path);
-        }
-      });
+        const isOverride = overrideFields.includes(field.path);
 
-      // Process all fields including array items
-      requestFields.forEach((field, idx) => {
-        // Skip if this is just an array container without direct value
-        if (field.isArray && field.value && Array.isArray(field.value)) {
-          // Add array container node
+        if (field.isKeyValueArray && field.items) {
           allNodes.push({
             id: `request-${field.path}`,
-            type: "fieldNode",
+            type: "arrayObjectNode",
             position: {
-              x: layoutMode === "horizontal" ? positions.request.x : 50,
+              x: positions.request.x,
               y: requestY,
             },
-            draggable: true,
             data: {
               id: `request-${field.path}`,
               key: field.path,
               originalKey: field.path,
-              value: `Array(${field.value.length})`,
-              type: "array",
-              category: "request" as FieldCategory,
-              isOverride: overrideFields.includes(field.path),
-              isArray: true,
+              items: field.items,
+              type: "array-object",
+              category: "request",
+              isOverride,
+              selectedItems:
+                arraySelections.get(`request-${field.path}`) || new Set(),
+              onSelectionChange: handleArraySelectionChange,
             },
           });
-          requestY += 120;
-        } else {
-          // Regular field or array item
-          const isOverride = overrideFields.includes(field.path);
-
+          requestY += 200 + field.items.length * 30;
+        } else if (
+          field.isArray &&
+          field.arrayIndex === undefined &&
+          !field.isKeyValueArray
+        ) {
           allNodes.push({
             id: `request-${field.path}`,
             type: "fieldNode",
             position: {
-              x: layoutMode === "horizontal" ? positions.request.x : 50,
+              x: positions.request.x,
               y: requestY,
             },
-            draggable: true,
+            data: {
+              id: `request-${field.path}`,
+              key: field.path,
+              originalKey: field.path,
+              value: Array.isArray(field.value)
+                ? `Array(${field.value.length})`
+                : "Array",
+              type: "array",
+              category: "request",
+              isOverride,
+              isArray: true,
+            },
+          });
+          requestY += 120;
+        } else if (!field.isArray) {
+          allNodes.push({
+            id: `request-${field.path}`,
+            type: "fieldNode",
+            position: {
+              x: positions.request.x,
+              y: requestY,
+            },
             data: {
               id: `request-${field.path}`,
               key: field.path,
               originalKey: field.path,
               value: field.value,
               type: field.type,
-              category: "request" as FieldCategory,
+              category: "request",
               isOverride,
-              isArrayItem: field.arrayIndex !== undefined,
-              arrayPath:
-                field.arrayIndex !== undefined
-                  ? getBaseArrayPath(field.path)
-                  : undefined,
             },
           });
-          requestY += 100; // Slightly smaller spacing for array items
+          requestY += 100;
         }
       });
     }
 
-    // Response fields (right column) - Enhanced with array support
     if (parsedResponse && typeof parsedResponse === "object") {
       const responseFields = processFieldsWithArrays(
         parsedResponse as Record<string, unknown>,
       );
 
-      responseFields.forEach((field, idx) => {
-        if (field.isArray && field.value && Array.isArray(field.value)) {
-          // Add array container node
-          const isMappedToContext = contextFields.includes(field.path);
+      responseFields.forEach((field) => {
+        const isMappedToContext = contextFields.includes(field.path);
 
+        if (field.isKeyValueArray && field.items) {
           allNodes.push({
             id: `response-${field.path}`,
-            type: "fieldNode",
+            type: "arrayObjectNode",
             position: {
-              x: layoutMode === "horizontal" ? positions.response.x : 700,
+              x: positions.response.x,
               y: responseY,
             },
-            draggable: true,
             data: {
               id: `response-${field.path}`,
               key: field.path,
               originalKey: field.path,
-              value: `Array(${field.value.length})`,
+              items: field.items,
+              type: "array-object",
+              category: "response",
+              isMappedToContext,
+              contextKey: isMappedToContext ? field.path : undefined,
+            },
+          });
+          responseY += 200 + field.items.length * 30;
+        } else if (
+          field.isArray &&
+          field.arrayIndex === undefined &&
+          !field.isKeyValueArray
+        ) {
+          allNodes.push({
+            id: `response-${field.path}`,
+            type: "fieldNode",
+            position: {
+              x: positions.response.x,
+              y: responseY,
+            },
+            data: {
+              id: `response-${field.path}`,
+              key: field.path,
+              originalKey: field.path,
+              value: Array.isArray(field.value)
+                ? `Array(${field.value.length})`
+                : "Array",
               type: "array",
-              category: "response" as FieldCategory,
+              category: "response",
               isMappedToContext,
               contextKey: isMappedToContext ? field.path : undefined,
               isArray: true,
             },
           });
           responseY += 120;
-        } else {
-          const isMappedToContext = contextFields.includes(field.path);
-
+        } else if (!field.isArray) {
           allNodes.push({
             id: `response-${field.path}`,
             type: "fieldNode",
             position: {
-              x: layoutMode === "horizontal" ? positions.response.x : 700,
+              x: positions.response.x,
               y: responseY,
             },
-            draggable: true,
             data: {
               id: `response-${field.path}`,
               key: field.path,
               originalKey: field.path,
               value: field.value,
               type: field.type,
-              category: "response" as FieldCategory,
+              category: "response",
               isMappedToContext,
               contextKey: isMappedToContext ? field.path : undefined,
-              isArrayItem: field.arrayIndex !== undefined,
-              arrayPath:
-                field.arrayIndex !== undefined
-                  ? getBaseArrayPath(field.path)
-                  : undefined,
             },
           });
           responseY += 100;
@@ -1220,147 +1379,33 @@ function WorkflowMindMapInner({
       });
     }
 
-    // Add Context Storage node with editable field mappings
-    const contextFieldsList: ContextFieldMapping[] = Array.from(
-      contextFieldMappings.entries(),
-    ).map(([originalKey, displayName]) => ({
-      originalKey,
-      displayName,
-    }));
-
     allNodes.push({
       id: "context-storage",
       type: "contextStorage",
-      position:
-        layoutMode === "horizontal"
-          ? { x: positions.contextStorage.x, y: positions.contextStorage.y }
-          : { x: 400, y: 50 },
-      draggable: true,
+      position: { x: 400, y: 50 },
       data: {
         label: "Context Storage",
-        fields: contextFieldsList,
-        onFieldRename: (originalKey: string, newName: string) => {
-          setContextFieldMappings((prev) => {
-            const updated = new Map(prev);
-            updated.set(originalKey, newName);
-            return updated;
-          });
-        },
-        onFieldRemove: (originalKey: string) => {
-          setContextFieldMappings((prev) => {
-            const updated = new Map(prev);
-            updated.delete(originalKey);
-            return updated;
-          });
-          // Also remove the edge
-          setEdges((eds) =>
-            eds.filter(
-              (e) =>
-                e.source !== `response-${originalKey}` ||
-                e.target !== "context-storage",
-            ),
-          );
-        },
+        fields: Array.from(contextFieldMappings.entries()).map(([k, v]) => ({
+          originalKey: k,
+          displayName: v,
+        })),
       },
     });
-
-    // Add Override Collection node with full field configurations
-    const overrideFieldsList: OverrideFieldConfig[] = Array.from(
-      overrideFieldConfigs.values(),
-    );
 
     allNodes.push({
       id: "override-collection",
       type: "overrideCollection",
-      position:
-        layoutMode === "horizontal"
-          ? {
-              x: positions.overrideCollection.x,
-              y: positions.overrideCollection.y,
-            }
-          : { x: 400, y: 350 },
-      draggable: true,
+      position: { x: 400, y: 350 },
       data: {
         label: "Override Fields",
-        fields: overrideFieldsList,
-        onFieldEdit: (field: OverrideFieldConfig) => {
-          setEditingOverrideField(field);
-          setShowOverrideModal(true);
-        },
-        onFieldRemove: (actualMapping: string) => {
-          setOverrideFieldConfigs((prev) => {
-            const updated = new Map(prev);
-            updated.delete(actualMapping);
-            return updated;
-          });
-          // Also remove the edge
-          setEdges((eds) =>
-            eds.filter(
-              (e) =>
-                e.source !== "override-collection" ||
-                e.target !== `request-${actualMapping}`,
-            ),
-          );
-        },
+        fields: Array.from(overrideFieldConfigs.values()),
       },
     });
 
-    // Add Context Timeline node (shows accumulated context across steps)
-    if (showContextPanel && stepIndex > 0) {
-      const timelineFields = Object.entries(inheritedContext).map(
-        ([key, value]) => ({
-          key,
-          value,
-          step:
-            ["TOKEN", "QUERY", "SETUP", "PAYMENT"][stepIndex - 1] || "UNKNOWN",
-          stepIndex: stepIndex - 1,
-        }),
-      );
-
-      allNodes.push({
-        id: "context-timeline",
-        type: "contextTimeline",
-        position: { x: layoutMode === "horizontal" ? 1150 : 950, y: 50 },
-        draggable: true,
-        data: {
-          label: "Accumulated Context",
-          fields: timelineFields,
-          currentStep: stepName,
-        },
-      });
-    }
-
-    // Add inheritance edges (dashed violet) from inherited fields to request fields
-    inheritedFields.forEach((field) => {
-      // Check if any request field uses this inherited field
-      const requestNodeId = `request-${field.key}`;
-      if (allNodes.some((n) => n.id === requestNodeId)) {
-        allEdges.push({
-          id: `edge-inherit-${field.key}`,
-          source: `inherited-${field.key}`,
-          target: requestNodeId,
-          animated: true,
-          style: inheritanceEdgeStyle,
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "#8b5cf6",
-            width: 16,
-            height: 16,
-          },
-          label: "inherited",
-          labelStyle: { fill: "#8b5cf6", fontWeight: 600, fontSize: 10 },
-          labelBgStyle: { fill: "white", fillOpacity: 0.9 },
-          labelBgPadding: [4, 2] as [number, number],
-          labelBgBorderRadius: 4,
-        });
-      }
-    });
-
     setNodes(allNodes);
-    setEdges((eds) => [...eds, ...allEdges]);
 
     setTimeout(() => {
-      if (allNodes.length > 2) {
+      if (allNodes.length > 0) {
         reactFlowInstance.fitView({ padding: 0.2 });
       }
     }, 100);
@@ -1369,18 +1414,12 @@ function WorkflowMindMapInner({
     parsedResponse,
     contextFieldMappings,
     overrideFieldConfigs,
-    setNodes,
-    setEdges,
-    reactFlowInstance,
-    layoutMode,
-    inheritedFields,
-    inheritedContext,
-    stepIndex,
     stepName,
-    showContextPanel,
+    stepIndex,
+    arraySelections,
+    handleArraySelectionChange,
   ]);
 
-  // Handle connections
   const onConnect = useCallback(
     (connection: Connection) => {
       const sourceNode = nodes.find((n) => n.id === connection.source);
@@ -1388,7 +1427,6 @@ function WorkflowMindMapInner({
 
       if (!sourceNode || !targetNode) return;
 
-      // Response → Context Storage: Add to context
       if (
         sourceNode.data.category === "response" &&
         targetNode.id === "context-storage"
@@ -1397,7 +1435,7 @@ function WorkflowMindMapInner({
         if (!contextFieldMappings.has(fieldKey)) {
           setContextFieldMappings((prev) => {
             const updated = new Map(prev);
-            updated.set(fieldKey, fieldKey); // Default display name is same as original
+            updated.set(fieldKey, fieldKey);
             return updated;
           });
         }
@@ -1424,16 +1462,14 @@ function WorkflowMindMapInner({
         return;
       }
 
-      // Override Collection → Request: Mark as override mapping and open config modal
       if (
         sourceNode.id === "override-collection" &&
         targetNode.data.category === "request"
       ) {
         const fieldKey = targetNode.data.originalKey || targetNode.data.key;
         if (!overrideFieldConfigs.has(fieldKey)) {
-          // Create default config and open modal for editing
           const defaultConfig: OverrideFieldConfig = {
-            field: fieldKey, // Default display name is same as original
+            field: fieldKey,
             value: `request.${fieldKey}`,
             actual_mapping: fieldKey,
             type: targetNode.data.type || "string",
@@ -1465,7 +1501,6 @@ function WorkflowMindMapInner({
         return;
       }
 
-      // Request → Response: Field mapping
       if (
         sourceNode.data.category === "request" &&
         targetNode.data.category === "response"
@@ -1492,7 +1527,6 @@ function WorkflowMindMapInner({
         return;
       }
 
-      // Generic connection
       const newEdge: Edge = {
         id: `edge-${connection.source}-${connection.target}-${Date.now()}`,
         source: connection.source!,
@@ -1506,7 +1540,6 @@ function WorkflowMindMapInner({
     [nodes, contextFieldMappings, overrideFieldConfigs, setEdges],
   );
 
-  // Handle saving override field configuration from modal
   const handleSaveOverrideField = useCallback((config: OverrideFieldConfig) => {
     setOverrideFieldConfigs((prev) => {
       const updated = new Map(prev);
@@ -1517,21 +1550,93 @@ function WorkflowMindMapInner({
     setEditingOverrideField(null);
   }, []);
 
-  // Toggle override on selected request nodes
+  // Replace the handleToggleOverride function with this fixed version:
   const handleToggleOverride = useCallback(() => {
-    const selectedRequestNodes = nodes.filter(
-      (n) => selectedNodes.includes(n.id) && n.data?.category === "request",
+    // Get all array nodes that have selected items
+    const arrayNodesWithSelections = Array.from(arraySelections.entries())
+      .filter(([_, selectedIndices]) => selectedIndices.size > 0)
+      .map(([nodeId]) => nodes.find((n) => n.id === nodeId))
+      .filter(Boolean);
+
+    // Get regular selected nodes (non-array nodes)
+    const regularSelectedNodes = nodes.filter(
+      (n) =>
+        selectedNodes.includes(n.id) &&
+        n.data?.category === "request" &&
+        n.type !== "arrayObjectNode",
     );
 
-    if (selectedRequestNodes.length === 0) {
-      console.log(
-        "No request nodes selected. Select request fields first, then click Mark Override.",
+    if (
+      arrayNodesWithSelections.length === 0 &&
+      regularSelectedNodes.length === 0
+    ) {
+      alert(
+        "Please either:\n1. Check boxes in array items, OR\n2. Select regular request fields",
       );
       return;
     }
 
-    selectedRequestNodes.forEach((node) => {
+    // Handle array nodes with selections
+    arrayNodesWithSelections.forEach((node) => {
+      if (!node) return;
+
       const fieldKey = node.data.originalKey || node.data.key;
+      const selectedIndices = arraySelections.get(node.id) || new Set();
+
+      selectedIndices.forEach((index) => {
+        const item = node.data.items[index];
+        if (item && item.Key) {
+          const valuePath = `${fieldKey}[${index}].Value`;
+
+          // Create a field name from the Key
+          const fieldName = String(item.Key).toLowerCase().replace(/\s+/g, "_");
+
+          // Check if already exists
+          if (!overrideFieldConfigs.has(valuePath)) {
+            const defaultConfig: OverrideFieldConfig = {
+              field: fieldName,
+              value: `request.${valuePath}`,
+              actual_mapping: valuePath,
+              type: detectDataType(item.Value) || "string",
+              required: true,
+            };
+
+            // Add to override configs
+            setOverrideFieldConfigs((prev) => {
+              const updated = new Map(prev);
+              updated.set(valuePath, defaultConfig);
+              return updated;
+            });
+
+            // Add edge from override collection to this array node
+            const newEdge: Edge = {
+              id: `edge-override-${node.id}-${index}-${Date.now()}`,
+              source: "override-collection",
+              target: node.id,
+              animated: true,
+              style: { stroke: "#f43f5e", strokeWidth: 3 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: "#f43f5e",
+                width: 20,
+                height: 20,
+              },
+              label: `overrides ${fieldName} →`,
+              labelStyle: { fill: "#f43f5e", fontWeight: 700, fontSize: 11 },
+              labelBgStyle: { fill: "white", fillOpacity: 0.95 },
+              labelBgPadding: [6, 4] as [number, number],
+              labelBgBorderRadius: 6,
+            };
+            setEdges((eds) => [...eds, newEdge]);
+          }
+        }
+      });
+    });
+
+    // Handle regular selected nodes
+    regularSelectedNodes.forEach((node) => {
+      const fieldKey = node.data.originalKey || node.data.key;
+
       if (overrideFieldConfigs.has(fieldKey)) {
         // Remove from override
         setOverrideFieldConfigs((prev) => {
@@ -1546,7 +1651,7 @@ function WorkflowMindMapInner({
           ),
         );
       } else {
-        // Create default config and open modal for editing
+        // Add to override
         const defaultConfig: OverrideFieldConfig = {
           field: fieldKey,
           value: `request.${fieldKey}`,
@@ -1554,8 +1659,13 @@ function WorkflowMindMapInner({
           type: node.data.type || "string",
           required: true,
         };
-        setEditingOverrideField(defaultConfig);
-        setShowOverrideModal(true);
+
+        setOverrideFieldConfigs((prev) => {
+          const updated = new Map(prev);
+          updated.set(fieldKey, defaultConfig);
+          return updated;
+        });
+
         // Add edge
         const newEdge: Edge = {
           id: `edge-override-${node.id}-${Date.now()}`,
@@ -1578,16 +1688,22 @@ function WorkflowMindMapInner({
         setEdges((eds) => [...eds, newEdge]);
       }
     });
-  }, [nodes, selectedNodes, overrideFieldConfigs, setEdges]);
+  }, [
+    nodes,
+    selectedNodes,
+    overrideFieldConfigs,
+    arraySelections,
+    setEdges,
+    setOverrideFieldConfigs,
+  ]);
 
-  // Toggle context storage on selected response nodes
   const handleToggleContext = useCallback(() => {
     const selectedResponseNodes = nodes.filter(
       (n) => selectedNodes.includes(n.id) && n.data?.category === "response",
     );
 
     if (selectedResponseNodes.length === 0) {
-      console.log(
+      alert(
         "No response nodes selected. Select response fields first, then click Store Context.",
       );
       return;
@@ -1596,26 +1712,22 @@ function WorkflowMindMapInner({
     selectedResponseNodes.forEach((node) => {
       const fieldKey = node.data.originalKey || node.data.key;
       if (contextFieldMappings.has(fieldKey)) {
-        // Remove from context
         setContextFieldMappings((prev) => {
           const updated = new Map(prev);
           updated.delete(fieldKey);
           return updated;
         });
-        // Remove edge
         setEdges((eds) =>
           eds.filter(
             (e) => e.source !== node.id || e.target !== "context-storage",
           ),
         );
       } else {
-        // Add to context with default display name
         setContextFieldMappings((prev) => {
           const updated = new Map(prev);
           updated.set(fieldKey, fieldKey);
           return updated;
         });
-        // Add edge
         const newEdge: Edge = {
           id: `edge-${node.id}-context-${Date.now()}`,
           source: node.id,
@@ -1639,7 +1751,6 @@ function WorkflowMindMapInner({
     });
   }, [nodes, selectedNodes, contextFieldMappings, setEdges]);
 
-  // Auto layout
   const handleAutoLayout = useCallback(() => {
     const requestNodes = nodes.filter((n) => n.data?.category === "request");
     const responseNodes = nodes.filter((n) => n.data?.category === "response");
@@ -1669,7 +1780,6 @@ function WorkflowMindMapInner({
     setTimeout(() => reactFlowInstance.fitView({ padding: 0.2 }), 50);
   }, [nodes, setNodes, reactFlowInstance]);
 
-  // Generate template config matching backend format
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
     const requestMapper: Record<string, string> = {};
@@ -1684,44 +1794,68 @@ function WorkflowMindMapInner({
       required: boolean;
     }> = [];
 
-    // Response mapper - handle array paths
     contextFieldMappings.forEach((displayName, originalKey) => {
-      // Store with original array notation
       responseMapper[originalKey] = displayName;
     });
 
-    // Override fields - handle array paths
     overrideFieldConfigs.forEach((config) => {
-      const overrideEntry: {
-        field: string;
-        value: string;
-        actual_mapping: string;
-        type: string;
-        max_length?: number;
-        min_length?: number;
-        pattern?: string;
-        required: boolean;
-      } = {
-        field: config.field,
-        value: config.value,
-        actual_mapping: config.actual_mapping,
-        type: config.type,
-        required: config.required,
-      };
+      if (
+        config.actual_mapping.includes("[") &&
+        config.actual_mapping.includes("]")
+      ) {
+        const match = config.actual_mapping.match(/\[(\d+)\]\.(\w+)/);
+        if (match) {
+          const [, , key] = match;
+          const fieldName = key.toLowerCase().replace(/\s+/g, "_");
 
-      if (config.max_length !== undefined) {
-        overrideEntry.max_length = config.max_length;
+          overriddenRequestBody.push({
+            field: fieldName,
+            value: `request.${config.actual_mapping}`,
+            actual_mapping: config.actual_mapping,
+            type: config.type,
+            required: config.required,
+            ...(config.max_length !== undefined && {
+              max_length: config.max_length,
+            }),
+            ...(config.min_length !== undefined && {
+              min_length: config.min_length,
+            }),
+            ...(config.pattern && { pattern: config.pattern }),
+          });
+        } else {
+          overriddenRequestBody.push({
+            field: config.field,
+            value: config.value,
+            actual_mapping: config.actual_mapping,
+            type: config.type,
+            required: config.required,
+            ...(config.max_length !== undefined && {
+              max_length: config.max_length,
+            }),
+            ...(config.min_length !== undefined && {
+              min_length: config.min_length,
+            }),
+            ...(config.pattern && { pattern: config.pattern }),
+          });
+        }
+      } else {
+        overriddenRequestBody.push({
+          field: config.field,
+          value: config.value,
+          actual_mapping: config.actual_mapping,
+          type: config.type,
+          required: config.required,
+          ...(config.max_length !== undefined && {
+            max_length: config.max_length,
+          }),
+          ...(config.min_length !== undefined && {
+            min_length: config.min_length,
+          }),
+          ...(config.pattern && { pattern: config.pattern }),
+        });
       }
-      if (config.min_length !== undefined) {
-        overrideEntry.min_length = config.min_length;
-      }
-      if (config.pattern) {
-        overrideEntry.pattern = config.pattern;
-      }
-      overriddenRequestBody.push(overrideEntry);
     });
 
-    // Request mapper - handle array paths in edges
     edges.forEach((edge) => {
       if (
         edge.source.startsWith("response-") &&
@@ -1732,21 +1866,79 @@ function WorkflowMindMapInner({
         if (srcNode && tgtNode) {
           const srcKey = srcNode.data.renamedTo || srcNode.data.originalKey;
           const tgtKey = tgtNode.data.renamedTo || tgtNode.data.originalKey;
-
-          // Handle array notation in source key
-          if (srcNode.data.isArrayItem) {
-            // For array items, use the base array path with wildcard
-            const basePath =
-              srcNode.data.arrayPath || srcKey.replace(/\[\d+\]/g, "[*]");
-            requestMapper[tgtKey] = `accumulated.${basePath}`;
-          } else {
-            requestMapper[tgtKey] = `accumulated.${srcKey}`;
-          }
+          requestMapper[tgtKey] = `accumulated.${srcKey}`;
         }
       }
     });
 
-    // ... rest of the generateConfig function ...
+    const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
+    const currentStepIdx = STEP_ORDER.indexOf(stepName || "");
+    const nextStepName =
+      currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
+        ? STEP_ORDER[currentStepIdx + 1]
+        : "DONE";
+
+    const template: Record<string, unknown> = {
+      name: stepName || "STEP",
+      current_step: stepName || "STEP",
+      next_step: nextStepName,
+      method: parsedRequest?.method || "POST",
+      url: parsedRequest?.url || "",
+      header_type: parsedRequest?.headers || {},
+      ...(parsedRequest?.body && { body: parsedRequest.body }),
+    };
+
+    if (Object.keys(requestMapper).length > 0) {
+      template.request_mapper = requestMapper;
+    }
+
+    if (Object.keys(responseMapper).length > 0) {
+      template.response_mapper = responseMapper;
+    }
+
+    const authHeader =
+      parsedRequest?.headers?.["Authorization"] ||
+      parsedRequest?.headers?.["authorization"];
+    if (authHeader?.toLowerCase().startsWith("bearer")) {
+      template.authorization_mapper = {
+        type: "bearer",
+        token: "accumulated.access_token",
+      };
+    }
+
+    if (overriddenRequestBody.length > 0) {
+      template.to_be_overridden = {
+        overridden_request_body: overriddenRequestBody,
+      };
+    }
+
+    const staticFields: Record<string, string> = {};
+    Object.entries(requestMapper).forEach(([key, value]) => {
+      if (
+        !value.includes("{{") &&
+        !value.includes("accumulated.") &&
+        !value.includes("context.")
+      ) {
+        staticFields[key] = value;
+      }
+    });
+
+    if (Object.keys(staticFields).length > 0) {
+      template.static_fields = staticFields;
+    }
+
+    Object.keys(template).forEach((key) => {
+      if (
+        template[key] === undefined ||
+        (typeof template[key] === "object" &&
+          template[key] !== null &&
+          Object.keys(template[key] as object).length === 0)
+      ) {
+        delete template[key];
+      }
+    });
+
+    return template;
   }, [
     nodes,
     edges,
@@ -1755,7 +1947,7 @@ function WorkflowMindMapInner({
     parsedRequest,
     stepName,
   ]);
-  // Export config
+
   const handleExport = useCallback(() => {
     const config = generateConfig();
     const blob = new Blob([JSON.stringify(config, null, 2)], {
@@ -1769,7 +1961,6 @@ function WorkflowMindMapInner({
     URL.revokeObjectURL(url);
   }, [generateConfig]);
 
-  // Copy config
   const handleCopyConfig = useCallback(() => {
     const config = generateConfig();
     navigator.clipboard.writeText(JSON.stringify(config, null, 2));
@@ -1777,11 +1968,10 @@ function WorkflowMindMapInner({
     setTimeout(() => setCopied(false), 2000);
   }, [generateConfig]);
 
-  const isEmpty = nodes.length <= 2; // Only storage nodes
+  const isEmpty = nodes.length <= 2;
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
-      {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-white/90 backdrop-blur-sm border-b shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-violet-600 rounded-lg text-white shadow-lg">
@@ -1796,7 +1986,6 @@ function WorkflowMindMapInner({
 
           <div className="h-6 w-px bg-gray-300" />
 
-          {/* Layout Mode Toggle */}
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => setLayoutMode("vertical")}
@@ -1835,7 +2024,6 @@ function WorkflowMindMapInner({
 
           <div className="h-6 w-px bg-gray-300" />
 
-          {/* Mark Override (for request fields) */}
           <button
             onClick={handleToggleOverride}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-rose-100 to-pink-100 text-rose-700 rounded-lg hover:from-rose-200 hover:to-pink-200 transition-colors font-medium border border-rose-200"
@@ -1845,7 +2033,6 @@ function WorkflowMindMapInner({
             Mark Override
           </button>
 
-          {/* Store in Context (for response fields) */}
           <button
             onClick={handleToggleContext}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 rounded-lg hover:from-violet-200 hover:to-purple-200 transition-colors font-medium border border-violet-200"
@@ -1857,7 +2044,6 @@ function WorkflowMindMapInner({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Panel toggles */}
           <button
             onClick={() => setShowContextPanel(!showContextPanel)}
             className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -1915,7 +2101,6 @@ function WorkflowMindMapInner({
         </div>
       </div>
 
-      {/* Instructions */}
       <div className="flex items-center gap-6 px-4 py-2 bg-white/70 border-b text-xs">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
@@ -1944,7 +2129,6 @@ function WorkflowMindMapInner({
         </div>
       </div>
 
-      {/* Canvas */}
       <div className="flex-1">
         {isEmpty ? (
           <div className="h-full flex items-center justify-center">
@@ -1967,7 +2151,6 @@ function WorkflowMindMapInner({
             onConnect={onConnect}
             onSelectionChange={onSelectionChange}
             onEdgeClick={(_, edge) => {
-              // Remove edge and update state
               if (edge.target === "context-storage") {
                 const sourceNode = nodes.find((n) => n.id === edge.source);
                 if (sourceNode) {
@@ -2039,11 +2222,9 @@ function WorkflowMindMapInner({
               style={{ width: 160, height: 100 }}
             />
 
-            {/* Stats Panel */}
             <Panel position="bottom-left" className="!m-4">
               <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border p-4">
                 <div className="grid grid-cols-5 gap-4 text-center">
-                  {/* Inherited fields count */}
                   {inheritedFields.length > 0 && (
                     <div>
                       <div className="text-2xl font-bold text-violet-600">
@@ -2086,7 +2267,6 @@ function WorkflowMindMapInner({
               </div>
             </Panel>
 
-            {/* Step Overview Panel - shows step navigation */}
             {showStepOverview && stepName && (
               <Panel position="top-left" className="!m-4">
                 <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border p-3">
@@ -2117,7 +2297,6 @@ function WorkflowMindMapInner({
               </Panel>
             )}
 
-            {/* Config Preview */}
             {(contextFieldMappings.size > 0 ||
               overrideFieldConfigs.size > 0) && (
               <Panel position="bottom-right" className="!m-4">
@@ -2191,7 +2370,6 @@ function WorkflowMindMapInner({
         )}
       </div>
 
-      {/* Override Field Configuration Modal */}
       <OverrideFieldModal
         isOpen={showOverrideModal}
         field={editingOverrideField}
