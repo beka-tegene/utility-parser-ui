@@ -912,7 +912,7 @@ function OverrideFieldModal({
     e.preventDefault();
     onSave({
       ...formData,
-      value: `request.${formData.actual_mapping}`,
+      value: `request.${formData.field}`,
     });
   };
 
@@ -1535,7 +1535,9 @@ function WorkflowMindMapInner({
           });
           setEdges((eds) =>
             eds.filter(
-              (e) => e.source !== `response-${originalKey}` || e.target !== "context-storage",
+              (e) =>
+                e.source !== `response-${originalKey}` ||
+                e.target !== "context-storage",
             ),
           );
         },
@@ -1561,7 +1563,9 @@ function WorkflowMindMapInner({
           });
           setEdges((eds) =>
             eds.filter(
-              (e) => e.source !== "override-collection" || e.target !== `request-${actualMapping}`,
+              (e) =>
+                e.source !== "override-collection" ||
+                e.target !== `request-${actualMapping}`,
             ),
           );
         },
@@ -1752,7 +1756,7 @@ function WorkflowMindMapInner({
         if (!node) return;
 
         const selections = arraySelections.get(node.id) || new Map();
-        
+
         // Show modal for the first selected item
         const firstItem = Array.from(selections.values())[0];
         if (firstItem) {
@@ -1795,12 +1799,7 @@ function WorkflowMindMapInner({
         }
       });
     }
-  }, [
-    nodes,
-    selectedNodes,
-    overrideFieldConfigs,
-    arraySelections,
-  ]);
+  }, [nodes, selectedNodes, overrideFieldConfigs, arraySelections]);
 
   // Handle Store Context button click
   const handleToggleContext = useCallback(() => {
