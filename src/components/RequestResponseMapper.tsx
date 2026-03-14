@@ -732,7 +732,10 @@ export function RequestResponseMapper() {
 
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
-    const requestMapper: Record<string, string> = {};
+    const requestMapper: Record<
+      string,
+      string | Array<{ Key: string; Value: string }>
+    > = {};
     const staticFields: Record<string, string> = {};
     const credentials: Record<string, string> = {};
     const overriddenRequestBody: Array<{
@@ -753,15 +756,15 @@ export function RequestResponseMapper() {
     const overrideConfigs = currentStepData?.overrideFieldConfigs || {};
 
     // Build response mapper from context field mappings
-    // In response_mapper, the key is the field name and value is the path or value
     Object.entries(contextMappings).forEach(([path, displayName]) => {
-      // Format path to use dots instead of brackets for the key
       const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
       responseMapper[displayName] = formattedKey;
     });
 
+    // Build Additional_Fields array for request mapper
+    const additionalFields: Array<{ Key: string; Value: string }> = [];
+
     // Build request mapper from edges (connections between response and request)
-    // In request_mapper, the key is the target field and value is the source path
     edges.forEach((edge) => {
       if (
         edge.source.startsWith("response-") &&
@@ -779,6 +782,12 @@ export function RequestResponseMapper() {
           // Format path to use dots instead of brackets
           srcPath = srcPath.replace(/\[/g, ".").replace(/\]/g, "");
 
+          // Add to Additional_Fields array
+          additionalFields.push({
+            Key: tgtKey,
+            Value: `{{accumulated.${srcPath}}}`,
+          });
+
           // Check if this is a static value or a reference
           if (
             srcNode.data.value &&
@@ -787,8 +796,6 @@ export function RequestResponseMapper() {
             !srcNode.data.value.includes("accumulated.")
           ) {
             staticFields[tgtKey] = srcNode.data.value as string;
-          } else {
-            requestMapper[tgtKey] = srcPath;
           }
         }
       }
@@ -809,6 +816,17 @@ export function RequestResponseMapper() {
           min_length: config.min_length,
         }),
         ...(config.pattern && { pattern: config.pattern }),
+      });
+
+      // Format the actual_mapping to use dots instead of brackets
+      const formattedPath = config.actual_mapping
+        .replace(/\[/g, ".")
+        .replace(/\]/g, "");
+
+      // Add to Additional_Fields array
+      additionalFields.push({
+        Key: config.field,
+        Value: `{{${config.value}}}`,
       });
     });
 
@@ -850,9 +868,11 @@ export function RequestResponseMapper() {
       body: parsedRequest?.body || {},
     };
 
-    // Add request_mapper if not empty
-    if (Object.keys(requestMapper).length > 0) {
-      template.request_mapper = requestMapper;
+    // Add request_mapper with Additional_Fields array if not empty
+    if (additionalFields.length > 0) {
+      template.request_mapper = {
+        Additional_Fields: additionalFields,
+      };
     }
 
     // Add response_mapper if not empty
@@ -876,18 +896,6 @@ export function RequestResponseMapper() {
       template.to_be_overridden = {
         overridden_request_body: overriddenRequestBody,
       };
-
-      // Add override fields to request_mapper
-      overriddenRequestBody.forEach((item) => {
-        // Format the actual_mapping to use dots instead of brackets
-        const formattedPath = item.actual_mapping
-          .replace(/\[/g, ".")
-          .replace(/\]/g, "");
-        requestMapper[item.field] = formattedPath;
-      });
-    }
-    if (Object.keys(requestMapper).length > 0) {
-      template.request_mapper = requestMapper;
     }
 
     // Remove undefined fields
