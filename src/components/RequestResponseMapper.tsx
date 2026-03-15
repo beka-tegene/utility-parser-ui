@@ -732,10 +732,7 @@ export function RequestResponseMapper() {
 
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
-    const requestMapper: Record<
-      string,
-      string | Array<{ Key: string; Value: string }>
-    > = {};
+    const requestMapper: Record<string, any> = {}; // Can hold both strings and objects
     const staticFields: Record<string, string> = {};
     const credentials: Record<string, string> = {};
     const overriddenRequestBody: Array<{
@@ -761,7 +758,8 @@ export function RequestResponseMapper() {
       responseMapper[displayName] = formattedKey;
     });
 
-    // Build Additional_Fields array for request mapper
+    // Separate collections for regular fields and array fields
+    const regularFields: Record<string, string> = {};
     const additionalFields: Array<{ Key: string; Value: string }> = [];
 
     // Build request mapper from edges (connections between response and request)
@@ -782,11 +780,24 @@ export function RequestResponseMapper() {
           // Format path to use dots instead of brackets
           srcPath = srcPath.replace(/\[/g, ".").replace(/\]/g, "");
 
-          // Add to Additional_Fields array
-          additionalFields.push({
-            Key: tgtKey,
-            Value: `{{accumulated.${srcPath}}}`,
-          });
+          // Check if this is from an array node or should go to Additional_Fields
+          const isArrayField =
+            tgtKey.toLowerCase().includes("limit") ||
+            tgtKey.toLowerCase().includes("additional") ||
+            tgtKey.toLowerCase().includes("field") ||
+            srcNode.type === "arrayObjectNode" ||
+            srcNode.data?.isArray === true;
+
+          if (isArrayField) {
+            // Add to Additional_Fields array
+            additionalFields.push({
+              Key: tgtKey,
+              Value: `{{accumulated.${srcPath}}}`,
+            });
+          } else {
+            // Add as regular field
+            regularFields[tgtKey] = `{{${srcPath}}}`;
+          }
 
           // Check if this is a static value or a reference
           if (
@@ -823,12 +834,45 @@ export function RequestResponseMapper() {
         .replace(/\[/g, ".")
         .replace(/\]/g, "");
 
-      // Add to Additional_Fields array
-      additionalFields.push({
-        Key: config.field,
-        Value: `{{${config.value}}}`,
-      });
+      // Check if this override should go to Additional_Fields
+      const isArrayField =
+        config.field.toLowerCase().includes("limit") ||
+        config.field.toLowerCase().includes("additional") ||
+        config.field.toLowerCase().includes("field");
+
+      if (isArrayField) {
+        // Add to Additional_Fields array
+        additionalFields.push({
+          Key: config.field,
+          Value: `{{${formattedPath}}}`,
+        });
+      } else {
+        // Add as regular field
+        regularFields[config.field] = `{{${formattedPath}}}`;
+      }
     });
+
+    // ============ PAYMENT STEP SPECIFIC AUTO-CONFIGURATION ============
+    if (currentStepName === "PAYMENT") {
+      // Always add Debit_Account_Number to regularFields
+      regularFields["Debit_Account_Number"] = "{{Debit_Account_Number}}";
+
+      // Always add Debit_Account_Number to overriddenRequestBody if not already present
+      const debitAccountExists = overriddenRequestBody.some(
+        (item) => item.field === "Debit_Account_Number",
+      );
+
+      if (!debitAccountExists) {
+        overriddenRequestBody.push({
+          field: "Debit_Account_Number",
+          value: "request.Debit_Account_Number",
+          actual_mapping: "Debit_Account_Number",
+          type: "string",
+          required: true,
+        });
+      }
+    }
+    // =================================================================
 
     // Extract credentials from request body for TOKEN step
     if (currentStepName === "TOKEN" && parsedRequest?.body) {
@@ -868,11 +912,17 @@ export function RequestResponseMapper() {
       body: parsedRequest?.body || {},
     };
 
-    // Add request_mapper with Additional_Fields array if not empty
+    // Build the final request_mapper
+    const finalRequestMapper: Record<string, any> = { ...regularFields };
+
+    // Add Additional_Fields if there are any
     if (additionalFields.length > 0) {
-      template.request_mapper = {
-        Additional_Fields: additionalFields,
-      };
+      finalRequestMapper.Additional_Fields = additionalFields;
+    }
+
+    // Add request_mapper if not empty
+    if (Object.keys(finalRequestMapper).length > 0) {
+      template.request_mapper = finalRequestMapper;
     }
 
     // Add response_mapper if not empty
