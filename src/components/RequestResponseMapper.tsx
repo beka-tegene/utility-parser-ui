@@ -75,6 +75,12 @@ const WORKFLOW_STEPS = [
 
 export function RequestResponseMapper() {
   // Multi-step state
+  // Step-specific JSON configurations
+  const [stepJsonConfigs, setStepJsonConfigs] = useState<
+    Record<number, string>
+  >({});
+  const [jsonSaved, setJsonSaved] = useState(false);
+
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [templateCode, setTemplateCode] = useState("DEFAULT");
 
@@ -1517,7 +1523,7 @@ export function RequestResponseMapper() {
           )}
 
           {activeView === "json" && (
-            <div className="h-full bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div className="h-full bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
                 <div className="flex items-center gap-2">
                   <FileJson className="w-4 h-4 text-gray-600" />
@@ -1530,108 +1536,71 @@ export function RequestResponseMapper() {
                     {currentStep?.name}
                   </span>
                 </div>
-                <button
-                  onClick={() => {
-                    const templateConfig = isSetupStep
-                      ? {
-                          name: "SETUP",
-                          current_step: "SETUP",
-                          next_step: "PAYMENT",
-                          body: setupConfig,
-                        }
-                      : {
-                          name: currentStepName || "STEP",
-                          current_step: currentStepName || "STEP",
-                          next_step:
-                            WORKFLOW_STEPS[activeStepIndex + 1]?.name || "DONE",
-                          url: parsedRequest?.url || "",
-                          method: parsedRequest?.method || "POST",
-                          header_type: parsedRequest?.headers || {},
-                          body: parsedRequest?.body || {},
-                          request_mapper: Object.keys(inheritedContext).reduce(
-                            (acc, key) => {
-                              acc[key] = `accumulated.${key}`;
-                              return acc;
-                            },
-                            {} as Record<string, string>,
-                          ),
-                          response_mapper: Object.keys(
-                            workflowContext.accumulated,
-                          ).reduce(
-                            (acc, key) => {
-                              acc[key] = key;
-                              return acc;
-                            },
-                            {} as Record<string, string>,
-                          ),
-                          ...(activeStepIndex > 0 && {
-                            authorization_mapper: {
-                              type: "bearer",
-                              token: "accumulated.access_token",
-                            },
-                          }),
-                        };
-                    handleCopy(templateConfig);
-                  }}
-                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
-                >
-                  {copied ? (
-                    <Check className="w-3 h-3" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                  Copy Template
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      // Save the edited config for this specific step
+                      try {
+                        const parsedConfig = JSON.parse(
+                          stepJsonConfigs[activeStepIndex] || "{}",
+                        );
+                        // Here you would save it to your state/store for this step
+                        console.log(
+                          `Saved config for step ${currentStep?.name}:`,
+                          parsedConfig,
+                        );
+
+                        // You could update the step-specific config in your store
+                        // updateStepConfig(templateCode, activeStepIndex, parsedConfig);
+
+                        setJsonSaved(true);
+                        setTimeout(() => setJsonSaved(false), 2000);
+                      } catch (e) {
+                        alert("Invalid JSON format");
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs text-green-600 hover:text-green-700 bg-green-50 rounded hover:bg-green-100"
+                  >
+                    {jsonSaved ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Save className="w-3 h-3" />
+                    )}
+                    Save Step Config
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleCopy(
+                        stepJsonConfigs[activeStepIndex] || generateConfig(),
+                      )
+                    }
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                  >
+                    {copied ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                    Copy
+                  </button>
+                </div>
               </div>
 
-              <div className="p-4 overflow-auto h-[calc(100%-50px)]">
-                <pre className="font-mono text-xs text-gray-700">
-                  {JSON.stringify(generateConfig(), null, 2)}
-
-                  {/* {JSON.stringify(
-                    isSetupStep
-                      ? {
-                          name: "SETUP",
-                          current_step: "SETUP",
-                          next_step: "PAYMENT",
-                          body: setupConfig,
-                        }
-                      : {
-                          name: currentStepName || "STEP",
-                          current_step: currentStepName || "STEP",
-                          next_step:
-                            WORKFLOW_STEPS[activeStepIndex + 1]?.name || "DONE",
-                          url: parsedRequest?.url || "",
-                          method: parsedRequest?.method || "POST",
-                          header_type: parsedRequest?.headers || {},
-                          body: parsedRequest?.body || {},
-                          request_mapper: Object.keys(inheritedContext).reduce(
-                            (acc, key) => {
-                              acc[key] = `accumulated.${key}`;
-                              return acc;
-                            },
-                            {} as Record<string, string>,
-                          ),
-                          response_mapper: Object.keys(
-                            workflowContext.accumulated,
-                          ).reduce(
-                            (acc, key) => {
-                              acc[key] = key;
-                              return acc;
-                            },
-                            {} as Record<string, string>,
-                          ),
-                          ...(activeStepIndex > 0 && {
-                            authorization_mapper: {
-                              type: "bearer",
-                              token: "accumulated.access_token",
-                            },
-                          }),
-                        },
-                    null,
-                    2,
-                  )} */}
-                </pre>
+              <div className="flex-1 p-4 overflow-auto">
+                <textarea
+                  value={
+                    stepJsonConfigs[activeStepIndex] ||
+                    JSON.stringify(generateConfig(), null, 2)
+                  }
+                  onChange={(e) => {
+                    setStepJsonConfigs((prev) => ({
+                      ...prev,
+                      [activeStepIndex]: e.target.value,
+                    }));
+                  }}
+                  className="w-full h-full font-mono text-xs bg-gray-900 text-green-400 p-4 rounded-lg border border-gray-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none"
+                  spellCheck={false}
+                />
               </div>
             </div>
           )}
