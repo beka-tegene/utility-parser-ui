@@ -84,6 +84,23 @@ export function RequestResponseMapper() {
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [templateCode, setTemplateCode] = useState("DEFAULT");
 
+  // Store manual additions separately
+  const [manualRequests, setManualRequests] = useState<
+    Record<
+      number,
+      Array<{
+        method: string;
+        url: string;
+        headers: Record<string, string>;
+        body: Record<string, unknown> | null;
+      }>
+    >
+  >({});
+
+  const [manualResponses, setManualResponses] = useState<
+    Record<number, Array<Record<string, unknown>>>
+  >({});
+
   // Per-step cURL and response data
   const [stepCurlInputs, setStepCurlInputs] = useState<Record<number, string>>(
     {},
@@ -124,8 +141,50 @@ export function RequestResponseMapper() {
     [activeStepIndex],
   );
 
-  // Current step's parsed request
-  const parsedRequest = stepParsedRequests[activeStepIndex] || null;
+  // Current step's parsed request (combine original + manual)
+  const parsedRequest = useMemo(() => {
+    const original = stepParsedRequests[activeStepIndex];
+    const manuals = manualRequests[activeStepIndex] || [];
+
+    if (!original && manuals.length === 0) return null;
+
+    // Start with original or empty
+    const combined: {
+      method: string;
+      url: string;
+      headers: Record<string, string>;
+      body: Record<string, unknown> | null;
+    } = original
+      ? { ...original }
+      : {
+          method: "POST",
+          url: "",
+          headers: {},
+          body: {},
+        };
+
+    // Merge all manual requests
+    manuals.forEach((manual) => {
+      if (manual.body) {
+        combined.body = {
+          ...(combined.body || {}),
+          ...manual.body,
+        };
+      }
+      if (manual.headers) {
+        combined.headers = {
+          ...combined.headers,
+          ...manual.headers,
+        };
+      }
+      // Use the last non-empty URL and method
+      if (manual.url) combined.url = manual.url;
+      if (manual.method) combined.method = manual.method;
+    });
+
+    return combined;
+  }, [activeStepIndex, stepParsedRequests, manualRequests]);
+
   const setParsedRequest = useCallback(
     (
       value: {
@@ -140,8 +199,24 @@ export function RequestResponseMapper() {
     [activeStepIndex],
   );
 
-  // Current step's response
-  const response = stepResponses[activeStepIndex] || null;
+  // Current step's response (combine original + manual)
+  const response = useMemo(() => {
+    const original = stepResponses[activeStepIndex];
+    const manuals = manualResponses[activeStepIndex] || [];
+
+    if (!original && manuals.length === 0) return null;
+
+    // Start with original or empty
+    const combined: Record<string, unknown> = original ? { ...original } : {};
+
+    // Merge all manual responses
+    manuals.forEach((manual) => {
+      Object.assign(combined, manual);
+    });
+
+    return combined;
+  }, [activeStepIndex, stepResponses, manualResponses]);
+
   const setResponse = useCallback(
     (value: Record<string, unknown> | null) => {
       setStepResponses((prev) => ({ ...prev, [activeStepIndex]: value }));
@@ -260,8 +335,6 @@ export function RequestResponseMapper() {
   }, []);
 
   // Parse cURL command
-  // Replace the handleParseCurl function with this fixed version:
-
   const handleParseCurl = useCallback(async () => {
     setError("");
     try {
@@ -305,13 +378,33 @@ export function RequestResponseMapper() {
           : "GET";
       const finalMethod = httpMethod || detectedMethod;
 
-      // Set the parsed request
-      setParsedRequest({
+      // Create the new request data
+      const newRequestData = {
         method: finalMethod,
         url: parsed.url,
         headers: parsed.headers,
         body: bodyObj,
-      });
+      };
+
+      // MERGE with existing data instead of replacing
+      setStepParsedRequests((prev) => ({
+        ...prev,
+        [activeStepIndex]: prev[activeStepIndex]
+          ? {
+              ...prev[activeStepIndex],
+              method: finalMethod,
+              url: parsed.url,
+              headers: {
+                ...prev[activeStepIndex].headers,
+                ...parsed.headers,
+              },
+              body: {
+                ...(prev[activeStepIndex].body || {}),
+                ...(bodyObj || {}),
+              },
+            }
+          : newRequestData,
+      }));
 
       // Execute the request
       setIsExecuting(true);
@@ -335,8 +428,14 @@ export function RequestResponseMapper() {
         responseData = { _raw: await res.text() };
       }
 
-      // Set the response
-      setResponse(responseData);
+      // MERGE response with existing data
+      setStepResponses((prev) => ({
+        ...prev,
+        [activeStepIndex]: prev[activeStepIndex]
+          ? { ...prev[activeStepIndex], ...responseData }
+          : responseData,
+      }));
+
       setIsExecuting(false);
 
       // Add to workflow steps
@@ -385,6 +484,7 @@ export function RequestResponseMapper() {
     workflowContext.accumulated,
     contextFields,
   ]);
+
   // Execute request
   const handleExecute = async () => {
     if (!parsedRequest) return;
@@ -412,7 +512,13 @@ export function RequestResponseMapper() {
         responseData = { _raw: await res.text() };
       }
 
-      setResponse(responseData);
+      // MERGE response with existing data
+      setStepResponses((prev) => ({
+        ...prev,
+        [activeStepIndex]: prev[activeStepIndex]
+          ? { ...prev[activeStepIndex], ...responseData }
+          : responseData,
+      }));
 
       // Add to workflow steps
       const newStep: StepData = {
@@ -474,6 +580,33 @@ export function RequestResponseMapper() {
     [],
   );
 
+  // Handle manual request addition
+  const handleManualRequestAdd = useCallback(
+    (requestData: {
+      method: string;
+      url: string;
+      headers: Record<string, string>;
+      body: Record<string, unknown> | null;
+    }) => {
+      setManualRequests((prev) => ({
+        ...prev,
+        [activeStepIndex]: [...(prev[activeStepIndex] || []), requestData],
+      }));
+    },
+    [activeStepIndex],
+  );
+
+  // Handle manual response addition
+  const handleManualResponseAdd = useCallback(
+    (responseData: Record<string, unknown>) => {
+      setManualResponses((prev) => ({
+        ...prev,
+        [activeStepIndex]: [...(prev[activeStepIndex] || []), responseData],
+      }));
+    },
+    [activeStepIndex],
+  );
+
   // Set manual response
   const handleSetManualResponse = () => {
     setError("");
@@ -484,7 +617,15 @@ export function RequestResponseMapper() {
       }
 
       const responseData = JSON.parse(responseInput);
-      setResponse(responseData);
+
+      // MERGE with existing response
+      setStepResponses((prev) => ({
+        ...prev,
+        [activeStepIndex]: prev[activeStepIndex]
+          ? { ...prev[activeStepIndex], ...responseData }
+          : responseData,
+      }));
+
       setShowResponseInput(false);
 
       // Add to workflow if we have a parsed request
@@ -526,8 +667,12 @@ export function RequestResponseMapper() {
     setResponseInput("");
     setCurrentStepName("");
     setShowResponseInput(false);
+    setManualRequests({});
+    setManualResponses({});
   };
+
   const [allData, setAllData] = useState<any[]>([]);
+
   // Export workflow configuration
   const handleExportConfig = () => {
     // Get all steps from the template
@@ -734,8 +879,6 @@ export function RequestResponseMapper() {
     return <span>{String(data)}</span>;
   };
 
-  // Replace the generateConfig function in your RequestResponseMapper component with this:
-
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
     const requestMapper: Record<string, any> = {}; // Can hold both strings and objects
@@ -820,20 +963,22 @@ export function RequestResponseMapper() {
 
     // Build override fields from override configs
     Object.values(overrideConfigs).forEach((config) => {
-      overriddenRequestBody.push({
-        field: config.field,
-        value: config.value,
-        actual_mapping: config.actual_mapping,
-        type: config.type,
-        required: config.required,
-        ...(config.max_length !== undefined && {
-          max_length: config.max_length,
-        }),
-        ...(config.min_length !== undefined && {
-          min_length: config.min_length,
-        }),
-        ...(config.pattern && { pattern: config.pattern }),
-      });
+      if (currentStepName !== "PAYMENT") {
+        overriddenRequestBody.push({
+          field: config.field,
+          value: config.value,
+          actual_mapping: config.actual_mapping,
+          type: config.type,
+          required: config.required,
+          ...(config.max_length !== undefined && {
+            max_length: config.max_length,
+          }),
+          ...(config.min_length !== undefined && {
+            min_length: config.min_length,
+          }),
+          ...(config.pattern && { pattern: config.pattern }),
+        });
+      }
 
       // Format the actual_mapping to use dots instead of brackets
       const formattedPath = config.actual_mapping
@@ -1491,23 +1636,16 @@ export function RequestResponseMapper() {
           {activeView === "mindmap" && !isSetupStep && (
             <div className="h-full">
               <WorkflowMindMap
-                parsedRequest={
-                  parsedRequest
-                    ? {
-                        method: parsedRequest.method,
-                        url: parsedRequest.url,
-                        headers: parsedRequest.headers,
-                        body: parsedRequest.body,
-                      }
-                    : undefined
-                }
-                parsedResponse={response}
+                parsedRequest={parsedRequest || undefined}
+                parsedResponse={response || undefined}
                 stepName={currentStep?.name}
                 stepIndex={activeStepIndex}
                 inheritedContext={inheritedContext}
                 initialContextMappings={initialContextMappings}
                 initialOverrideConfigs={initialOverrideConfigs}
                 onCanvasStateChange={handleCanvasStateChange}
+                onManualRequestAdd={handleManualRequestAdd}
+                onManualResponseAdd={handleManualResponseAdd}
               />
             </div>
           )}
