@@ -413,28 +413,28 @@ export function RequestResponseMapper() {
         ? new URLSearchParams(bodyObj as Record<string, string>).toString()
         : undefined;
 
-      const res = await fetch(parsed.url, {
-        method: finalMethod,
-        headers: parsed.headers,
-        body: urlEncodedBody,
-      });
+      // const res = await fetch(parsed.url, {
+      //   method: finalMethod,
+      //   headers: parsed.headers,
+      //   body: urlEncodedBody,
+      // });
 
-      const contentType = res.headers.get("content-type");
-      let responseData: Record<string, unknown>;
+      // const contentType = res.headers.get("content-type");
+      // let responseData: Record<string, unknown>;
 
-      if (contentType?.includes("application/json")) {
-        responseData = await res.json();
-      } else {
-        responseData = { _raw: await res.text() };
-      }
+      // if (contentType?.includes("application/json")) {
+      //   responseData = await res.json();
+      // } else {
+      //   responseData = { _raw: await res.text() };
+      // }
 
       // MERGE response with existing data
-      setStepResponses((prev) => ({
-        ...prev,
-        [activeStepIndex]: prev[activeStepIndex]
-          ? { ...prev[activeStepIndex], ...responseData }
-          : responseData,
-      }));
+      // setStepResponses((prev) => ({
+      //   ...prev,
+      //   [activeStepIndex]: prev[activeStepIndex]
+      //     ? { ...prev[activeStepIndex], ...responseData }
+      //     : responseData,
+      // }));
 
       setIsExecuting(false);
 
@@ -447,7 +447,7 @@ export function RequestResponseMapper() {
           headers: parsed.headers,
           body: bodyObj,
         },
-        response: responseData,
+        response: {},
         timestamp: new Date().toISOString(),
       };
 
@@ -456,7 +456,7 @@ export function RequestResponseMapper() {
       contextFields.forEach((fieldPath) => {
         // Extract the value from response
         const parts = fieldPath.replace("response.", "").split(".");
-        let value: unknown = responseData;
+        let value: unknown = {};
         for (const part of parts) {
           if (value && typeof value === "object") {
             value = (value as Record<string, unknown>)[part];
@@ -671,6 +671,16 @@ export function RequestResponseMapper() {
     setManualResponses({});
   };
 
+
+  const clearAllStorage = useAppStore((state) => state.clearAllStorage);
+  
+  const handleClear = () => {
+    if (confirm("Are you sure you want to clear all saved data? This cannot be undone.")) {
+      clearAllStorage();
+      // Optionally reload the page
+      window.location.reload();
+    }
+  };
   const [allData, setAllData] = useState<any[]>([]);
 
   // Export workflow configuration
@@ -960,6 +970,7 @@ export function RequestResponseMapper() {
         }
       }
     });
+    console.log(overrideConfigs);
 
     // Build override fields from override configs
     Object.values(overrideConfigs).forEach((config) => {
@@ -999,7 +1010,7 @@ export function RequestResponseMapper() {
         });
       } else {
         // Add as regular field
-        regularFields[config.field] = `{{${formattedPath}}}`;
+        regularFields[config.field] = `{{${config.value}}}`;
       }
     });
 
@@ -1200,7 +1211,7 @@ export function RequestResponseMapper() {
             </button>
 
             <button
-              onClick={handleResetWorkflow}
+              onClick={handleClear}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-xs font-medium hover:bg-red-100 transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" />

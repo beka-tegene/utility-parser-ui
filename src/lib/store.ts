@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   Collection,
   Template,
@@ -10,10 +10,11 @@ import type {
   StepCurlData,
   AccumulatedContext,
   MultiStepData,
-} from '@/types';
+} from "@/types";
 
 // Generate unique ID
-const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateId = () =>
+  `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 interface AppState {
   // Current collection being edited
@@ -43,7 +44,11 @@ interface AppState {
   testToken: string | null;
   setTestToken: (token: string | null) => void;
   testResponses: Array<{ step: number; data: unknown; timestamp: string }>;
-  addTestResponse: (response: { step: number; data: unknown; timestamp: string }) => void;
+  addTestResponse: (response: {
+    step: number;
+    data: unknown;
+    timestamp: string;
+  }) => void;
   clearTestResponses: () => void;
 
   // API base URL
@@ -51,8 +56,8 @@ interface AppState {
   setApiBaseUrl: (url: string) => void;
 
   // UI state
-  activeTab: 'mapper' | 'test' | 'collections';
-  setActiveTab: (tab: 'mapper' | 'test' | 'collections') => void;
+  activeTab: "mapper" | "test" | "collections";
+  setActiveTab: (tab: "mapper" | "test" | "collections") => void;
 
   // Collections list
   collections: Collection[];
@@ -72,20 +77,32 @@ interface AppState {
 
   // ============ Multi-Step Workflow State ============
   multiStepData: MultiStepData;
-  setMultiStepData: (templateCode: string, data: {
-    steps: StepCurlData[];
-    activeStepIndex: number;
-    accumulatedContext: AccumulatedContext;
-  }) => void;
-  updateStepCurlData: (templateCode: string, stepIndex: number, data: Partial<StepCurlData>) => void;
+  setMultiStepData: (
+    templateCode: string,
+    data: {
+      steps: StepCurlData[];
+      activeStepIndex: number;
+      accumulatedContext: AccumulatedContext;
+    },
+  ) => void;
+  updateStepCurlData: (
+    templateCode: string,
+    stepIndex: number,
+    data: Partial<StepCurlData>,
+  ) => void;
   setActiveStepIndex: (templateCode: string, index: number) => void;
-  updateAccumulatedContext: (templateCode: string, stepName: string, fields: Record<string, unknown>) => void;
+  updateAccumulatedContext: (
+    templateCode: string,
+    stepName: string,
+    fields: Record<string, unknown>,
+  ) => void;
   getMultiStepData: (templateCode: string) => {
     steps: StepCurlData[];
     activeStepIndex: number;
     accumulatedContext: AccumulatedContext;
   } | null;
   initializeMultiStepData: (templateCode: string, stepCount: number) => void;
+  clearAllStorage: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -103,7 +120,9 @@ export const useAppStore = create<AppState>()(
       requestMappings: [],
       setRequestMappings: (mappings) => set({ requestMappings: mappings }),
       addRequestMapping: (mapping) =>
-        set((state) => ({ requestMappings: [...state.requestMappings, mapping] })),
+        set((state) => ({
+          requestMappings: [...state.requestMappings, mapping],
+        })),
       removeRequestMapping: (id) =>
         set((state) => ({
           requestMappings: state.requestMappings.filter((m) => m.id !== id),
@@ -112,7 +131,9 @@ export const useAppStore = create<AppState>()(
       responseMappings: [],
       setResponseMappings: (mappings) => set({ responseMappings: mappings }),
       addResponseMapping: (mapping) =>
-        set((state) => ({ responseMappings: [...state.responseMappings, mapping] })),
+        set((state) => ({
+          responseMappings: [...state.responseMappings, mapping],
+        })),
       removeResponseMapping: (id) =>
         set((state) => ({
           responseMappings: state.responseMappings.filter((m) => m.id !== id),
@@ -125,10 +146,10 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ testResponses: [...state.testResponses, response] })),
       clearTestResponses: () => set({ testResponses: [], testToken: null }),
 
-      apiBaseUrl: 'http://localhost:8080',
+      apiBaseUrl: "http://localhost:8080",
       setApiBaseUrl: (url) => set({ apiBaseUrl: url }),
 
-      activeTab: 'mapper',
+      activeTab: "mapper",
       setActiveTab: (tab) => set({ activeTab: tab }),
 
       collections: [],
@@ -138,7 +159,7 @@ export const useAppStore = create<AppState>()(
       updateCollection: (id, collection) =>
         set((state) => ({
           collections: state.collections.map((c) =>
-            c.id === id ? collection : c
+            c.id === id ? collection : c,
           ),
         })),
       removeCollection: (id) =>
@@ -160,16 +181,23 @@ export const useAppStore = create<AppState>()(
           timestamp: new Date().toISOString(),
           label,
           state: {
-            collection: state.collection ? JSON.parse(JSON.stringify(state.collection)) : null,
+            collection: state.collection
+              ? JSON.parse(JSON.stringify(state.collection))
+              : null,
             currentTemplateIndex: state.currentTemplateIndex,
             requestMappings: JSON.parse(JSON.stringify(state.requestMappings)),
-            responseMappings: JSON.parse(JSON.stringify(state.responseMappings)),
+            responseMappings: JSON.parse(
+              JSON.stringify(state.responseMappings),
+            ),
           },
         };
 
         set((state) => {
           // Remove any snapshots after current index (for new branch)
-          const newSnapshots = state.history.snapshots.slice(0, state.history.currentIndex + 1);
+          const newSnapshots = state.history.snapshots.slice(
+            0,
+            state.history.currentIndex + 1,
+          );
           newSnapshots.push(snapshot);
 
           // Keep only maxSnapshots
@@ -210,7 +238,8 @@ export const useAppStore = create<AppState>()(
 
       redo: () => {
         const state = get();
-        if (state.history.currentIndex >= state.history.snapshots.length - 1) return;
+        if (state.history.currentIndex >= state.history.snapshots.length - 1)
+          return;
 
         const nextIndex = state.history.currentIndex + 1;
         const snapshot = state.history.snapshots[nextIndex];
@@ -331,15 +360,18 @@ export const useAppStore = create<AppState>()(
         const existing = get().multiStepData[templateCode];
         if (existing) return; // Already initialized
 
-        const stepNames = ['TOKEN', 'QUERY', 'SETUP', 'PAYMENT'];
-        const steps: StepCurlData[] = Array.from({ length: stepCount }, (_, i) => ({
-          stepIndex: i,
-          stepName: stepNames[i] || `STEP_${i + 1}`,
-          curlInput: '',
-          parsedRequest: null,
-          responseInput: '',
-          parsedResponse: null,
-        }));
+        const stepNames = ["TOKEN", "QUERY", "SETUP", "PAYMENT"];
+        const steps: StepCurlData[] = Array.from(
+          { length: stepCount },
+          (_, i) => ({
+            stepIndex: i,
+            stepName: stepNames[i] || `STEP_${i + 1}`,
+            curlInput: "",
+            parsedRequest: null,
+            responseInput: "",
+            parsedResponse: null,
+          }),
+        );
 
         set((state) => ({
           multiStepData: {
@@ -352,9 +384,37 @@ export const useAppStore = create<AppState>()(
           },
         }));
       },
+
+      clearAllStorage: () => {
+        // Clear from localStorage
+        localStorage.removeItem("utility-parser-storage");
+
+        // Reset store to initial state
+        set({
+          collection: null,
+          collections: [],
+          apiBaseUrl: "http://localhost:8080",
+          multiStepData: {},
+          requestMappings: [],
+          responseMappings: [],
+          parsedCurl: null,
+          testToken: null,
+          testResponses: [],
+          activeTab: "mapper",
+          currentTemplateIndex: 0,
+          history: {
+            snapshots: [],
+            currentIndex: -1,
+            maxSnapshots: 50,
+          },
+        });
+
+        // Clear history
+        get().clearHistory();
+      },
     }),
     {
-      name: 'utility-parser-storage',
+      name: "utility-parser-storage",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         // Only persist these fields
@@ -366,47 +426,47 @@ export const useAppStore = create<AppState>()(
         requestMappings: state.requestMappings,
         responseMappings: state.responseMappings,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Standard workflow steps following backend pattern
-const WORKFLOW_STEPS = ['TOKEN', 'QUERY', 'SETUP', 'PAYMENT'] as const;
+const WORKFLOW_STEPS = ["TOKEN", "QUERY", "SETUP", "PAYMENT"] as const;
 const NEXT_STEPS: Record<string, string> = {
-  'TOKEN': 'QUERY',
-  'QUERY': 'SETUP',
-  'SETUP': 'PAYMENT',
-  'PAYMENT': 'DONE',
+  TOKEN: "QUERY",
+  QUERY: "SETUP",
+  SETUP: "PAYMENT",
+  PAYMENT: "DONE",
 };
 
 // Helper to create a TOKEN step template
 export function createTokenTemplate(): Template {
   return {
-    name: 'TOKEN',
-    current_step: 'TOKEN',
-    next_step: 'QUERY',
-    method: 'POST',
-    url: '',
+    name: "TOKEN",
+    current_step: "TOKEN",
+    next_step: "QUERY",
+    method: "POST",
+    url: "",
     header_type: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      "Content-Type": "application/x-www-form-urlencoded",
     },
     credentials: {
-      grant_type: 'client_credentials',
-      client_id: '',
-      client_secret: '',
-      scope: '',
+      grant_type: "client_credentials",
+      client_id: "",
+      client_secret: "",
+      scope: "",
     },
     body: {},
     request_mapper: {
-      'grant_type': 'credentials.grant_type',
-      'client_id': 'credentials.client_id',
-      'client_secret': 'credentials.client_secret',
-      'scope': 'credentials.scope',
+      grant_type: "credentials.grant_type",
+      client_id: "credentials.client_id",
+      client_secret: "credentials.client_secret",
+      scope: "credentials.scope",
     },
     response_mapper: {
-      'access_token': 'access_token',
-      'token_type': 'token_type',
-      'expires_in': 'expires_in',
+      access_token: "access_token",
+      token_type: "token_type",
+      expires_in: "expires_in",
     },
   };
 }
@@ -414,22 +474,22 @@ export function createTokenTemplate(): Template {
 // Helper to create a QUERY step template
 export function createQueryTemplate(): Template {
   return {
-    name: 'QUERY',
-    current_step: 'QUERY',
-    next_step: 'SETUP',
-    method: 'POST',
-    url: '',
+    name: "QUERY",
+    current_step: "QUERY",
+    next_step: "SETUP",
+    method: "POST",
+    url: "",
     header_type: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     authorization_mapper: {
-      type: 'bearer',
-      token: 'accumulated.access_token',
+      type: "bearer",
+      token: "accumulated.access_token",
     },
     body: {
-      'Destination_Api_Name': '',
-      'End_To_End_Txn_Id': '',
-      'Bill_Id': '',
+      Destination_Api_Name: "",
+      End_To_End_Txn_Id: "",
+      Bill_Id: "",
     },
     request_mapper: {},
     response_mapper: {},
@@ -442,11 +502,11 @@ export function createQueryTemplate(): Template {
 // Helper to create a SETUP step template
 export function createSetupTemplate(): Template {
   return {
-    name: 'SETUP',
-    current_step: 'SETUP',
-    next_step: 'PAYMENT',
+    name: "SETUP",
+    current_step: "SETUP",
+    next_step: "PAYMENT",
     body: {
-      type: 'single',
+      type: "single",
       payables: [],
     },
   };
@@ -455,26 +515,26 @@ export function createSetupTemplate(): Template {
 // Helper to create a PAYMENT step template
 export function createPaymentTemplate(): Template {
   return {
-    name: 'PAYMENT',
-    current_step: 'PAYMENT',
-    next_step: 'DONE',
-    method: 'POST',
-    url: '',
+    name: "PAYMENT",
+    current_step: "PAYMENT",
+    next_step: "DONE",
+    method: "POST",
+    url: "",
     header_type: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     authorization_mapper: {
-      type: 'bearer',
-      token: 'accumulated.access_token',
+      type: "bearer",
+      token: "accumulated.access_token",
     },
     body: {
-      'Destination_Api_Name': '',
-      'End_To_End_Txn_Id': '',
-      'Cbe_Txn_Ref': '',
-      'Timestamp': '',
-      'Bill_Id': '',
-      'Amount': '',
-      'Currency': 'ETB',
+      Destination_Api_Name: "",
+      End_To_End_Txn_Id: "",
+      Cbe_Txn_Ref: "",
+      Timestamp: "",
+      Bill_Id: "",
+      Amount: "",
+      Currency: "ETB",
     },
     request_mapper: {},
     response_mapper: {},
@@ -482,7 +542,7 @@ export function createPaymentTemplate(): Template {
       overridden_request_body: [],
     },
     static_fields: {
-      'Currency': 'ETB',
+      Currency: "ETB",
     },
   };
 }
@@ -503,11 +563,11 @@ export function createEmptyTemplate(stepIndex: number): Template {
       return {
         name: `Step ${stepIndex + 1}`,
         current_step: `STEP_${stepIndex + 1}`,
-        next_step: stepIndex < 3 ? WORKFLOW_STEPS[stepIndex + 1] : 'DONE',
-        method: 'POST',
-        url: '',
+        next_step: stepIndex < 3 ? WORKFLOW_STEPS[stepIndex + 1] : "DONE",
+        method: "POST",
+        url: "",
         header_type: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: {},
         request_mapper: {},
@@ -519,9 +579,9 @@ export function createEmptyTemplate(stepIndex: number): Template {
 // Helper to create a full 4-step workflow collection
 export function createEmptyCollection(): Collection {
   return {
-    template_code: '',
-    name: '',
-    description: '',
+    template_code: "",
+    name: "",
+    description: "",
     templates: [
       createTokenTemplate(),
       createQueryTemplate(),
@@ -529,22 +589,27 @@ export function createEmptyCollection(): Collection {
       createPaymentTemplate(),
     ],
     sequence: 4,
-    logo: '',
-    credit_account: '',
+    logo: "",
+    credit_account: "",
     ussd_enabled: false,
     static_fields: {
-      currency: 'ETB',
+      currency: "ETB",
     },
   };
 }
 
 // Helper to check if a step is a SETUP step
 export function isSetupStep(template: Template): boolean {
-  return template.current_step === 'SETUP' ||
-         (template.body && typeof template.body === 'object' && 'type' in template.body && 'payables' in template.body);
+  return (
+    template.current_step === "SETUP" ||
+    (template.body &&
+      typeof template.body === "object" &&
+      "type" in template.body &&
+      "payables" in template.body)
+  );
 }
 
 // Helper to check if a step needs authorization
 export function needsAuthorization(template: Template): boolean {
-  return template.current_step !== 'TOKEN' && template.current_step !== 'SETUP';
+  return template.current_step !== "TOKEN" && template.current_step !== "SETUP";
 }

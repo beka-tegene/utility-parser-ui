@@ -48,6 +48,7 @@ import {
   LayoutGrid,
   Focus,
   AlertCircle,
+  Save,
 } from "lucide-react";
 
 // Layout modes
@@ -71,6 +72,7 @@ interface FieldData {
   isArray?: boolean;
   isArrayItem?: boolean;
   arrayPath?: string;
+  editedValue?: string; // New field for edited values
 }
 
 interface ArrayObjectNodeData {
@@ -89,6 +91,7 @@ interface ArrayObjectNodeData {
     nodeId: string,
     selections: Map<string, { path: string; key: string; value: string }>,
   ) => void;
+  onValueEdit?: (path: string, newValue: string) => void; // New callback for value edits
 }
 
 // ============ Colors ============
@@ -193,6 +196,12 @@ function ArrayObjectNode({
         setEditableItems(updatedItems);
         data.items = updatedItems;
 
+        // Notify parent about value change
+        if (data.onValueEdit) {
+          const path = `${data.key}[${parentIndex}].Sub_Fields[${subFieldIndex}].Value`;
+          data.onValueEdit(path, newValue);
+        }
+
         // Update selected item if it exists
         if (selectedItems.has(`${parentIndex}-${subFieldIndex}`)) {
           const newSelected = new Map(selectedItems);
@@ -214,6 +223,12 @@ function ArrayObjectNode({
       };
       setEditableItems(updatedItems);
       data.items = updatedItems;
+
+      // Notify parent about value change
+      if (data.onValueEdit) {
+        const path = `${data.key}[${parentIndex}].Value`;
+        data.onValueEdit(path, newValue);
+      }
 
       // Update selected item if it exists
       if (selectedItems.has(`${parentIndex}`)) {
@@ -454,6 +469,14 @@ function ArrayObjectNode({
 function FieldNode({ data, selected }: NodeProps<FieldData>) {
   const [isEditing, setIsEditing] = useState(false);
   const [editKey, setEditKey] = useState(data.renamedTo || data.key);
+  const [editValue, setEditValue] = useState(
+    data.editedValue !== undefined
+      ? String(data.editedValue)
+      : data.value !== undefined
+        ? String(data.value)
+        : "",
+  );
+  const [isEditingValue, setIsEditingValue] = useState(false);
   const colors = categoryColors[data.category];
 
   const handleRename = () => {
@@ -461,6 +484,11 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
       data.renamedTo = editKey;
     }
     setIsEditing(false);
+  };
+
+  const handleValueSave = () => {
+    data.editedValue = editValue;
+    setIsEditingValue(false);
   };
 
   const displayCategory = data.isOverride
@@ -514,6 +542,13 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
         </div>
       )}
 
+      {data.editedValue !== undefined && data.editedValue !== data.value && (
+        <div className="absolute -top-3 left-2 px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg flex items-center gap-1 z-10">
+          <Save className="w-2.5 h-2.5" />
+          EDITED
+        </div>
+      )}
+
       <div
         className={`px-3 py-2 bg-gradient-to-r ${displayColors.gradient} rounded-t-lg`}
       >
@@ -529,7 +564,7 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
 
       <div className="px-3 py-3">
         {isEditing ? (
-          <div className="flex gap-1">
+          <div className="flex gap-1 mb-2">
             <input
               type="text"
               value={editKey}
@@ -564,12 +599,61 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
           </div>
         )}
 
-        {data.value !== undefined && data.value !== "" && (
-          <div className="text-[11px] text-gray-500 font-mono mt-2 truncate bg-white/70 px-2 py-1 rounded border border-gray-200">
-            {String(data.value).slice(0, 35)}
-            {String(data.value).length > 35 ? "..." : ""}
+        {/* Editable Value Field */}
+        <div className="mt-2">
+          <div className="text-[10px] text-gray-500 font-medium mb-1">
+            Value:
           </div>
-        )}
+          {isEditingValue ? (
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleValueSave}
+                onKeyDown={(e) => e.key === "Enter" && handleValueSave()}
+                className="flex-1 text-xs bg-white border-2 border-green-300 rounded-lg px-2 py-1 focus:outline-none focus:border-green-500 font-mono"
+                autoFocus
+              />
+              <button
+                onClick={handleValueSave}
+                className="p-1 bg-green-100 text-green-600 rounded hover:bg-green-200"
+              >
+                <Check className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <div
+              className="text-xs font-mono bg-gray-50 px-2 py-1 rounded border border-gray-200 cursor-text hover:border-green-300 flex items-center justify-between group/value"
+              onDoubleClick={() => setIsEditingValue(true)}
+              title="Double-click to edit value"
+            >
+              <span className="truncate text-gray-700">
+                {data.editedValue !== undefined
+                  ? String(data.editedValue).slice(0, 30)
+                  : data.value !== undefined
+                    ? String(data.value).slice(0, 30)
+                    : "(empty)"}
+                {(data.editedValue !== undefined
+                  ? String(data.editedValue).length > 30
+                  : data.value !== undefined
+                    ? String(data.value).length > 30
+                    : false) && "..."}
+              </span>
+              <Edit3 className="w-3 h-3 text-gray-400 opacity-0 group-value-hover:opacity-100 transition-opacity" />
+            </div>
+          )}
+        </div>
+
+        {/* Show original value if edited */}
+        {data.editedValue !== undefined &&
+          data.editedValue !== data.value &&
+          data.value !== undefined && (
+            <div className="text-[9px] text-gray-400 font-mono mt-1 line-through opacity-60">
+              original: {String(data.value).slice(0, 20)}
+              {String(data.value).length > 20 ? "..." : ""}
+            </div>
+          )}
       </div>
 
       <div className="absolute -bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -579,6 +663,13 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
           title="Rename field"
         >
           <Tag className="w-3 h-3" />
+        </button>
+        <button
+          onClick={() => setIsEditingValue(true)}
+          className="p-1.5 bg-white rounded-full shadow-lg hover:bg-green-100 text-green-600 border border-green-200"
+          title="Edit value"
+        >
+          <Edit3 className="w-3 h-3" />
         </button>
       </div>
     </div>
@@ -884,6 +975,7 @@ interface WorkflowMindMapProps {
     body: Record<string, unknown> | null;
   }) => void;
   onManualResponseAdd?: (response: Record<string, unknown>) => void;
+  onRequestValueEdit?: (path: string, newValue: string) => void; // New callback for value edits
 }
 
 // ============ Override Field Configuration Modal ============
@@ -920,7 +1012,7 @@ function OverrideFieldModal({
     e.preventDefault();
     onSave({
       ...formData,
-      value: `request.${formData.field}`,
+      value: `${formData.value}`,
     });
   };
 
@@ -990,9 +1082,12 @@ function OverrideFieldModal({
             </label>
             <input
               type="text"
-              value={`request.${formData.actual_mapping}`}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 font-mono text-sm"
-              readOnly
+              value={`${formData.value}`}
+              onChange={(e) =>
+                setFormData({ ...formData, value: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+              required
             />
             <p className="text-xs text-gray-500 mt-1">
               Auto-generated: request.{"{actual_mapping}"}
@@ -1136,6 +1231,7 @@ function WorkflowMindMapInner({
   onCanvasStateChange,
   onManualRequestAdd,
   onManualResponseAdd,
+  onRequestValueEdit,
 }: WorkflowMindMapProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -1159,6 +1255,10 @@ function WorkflowMindMapInner({
   >("request");
   const [manualJsonInput, setManualJsonInput] = useState("");
   const [manualJsonError, setManualJsonError] = useState("");
+  // Store edited values for request fields
+  const [editedRequestValues, setEditedRequestValues] = useState<
+    Map<string, string>
+  >(new Map());
   const reactFlowInstance = useReactFlow();
   const [arraySelections, setArraySelections] = useState<
     Map<string, Map<string, { path: string; key: string; value: string }>>
@@ -1320,6 +1420,23 @@ function WorkflowMindMapInner({
     onManualResponseAdd,
   ]);
 
+  // Handle request value edit
+  const handleRequestValueEdit = useCallback(
+    (path: string, newValue: string) => {
+      setEditedRequestValues((prev) => {
+        const updated = new Map(prev);
+        updated.set(path, newValue);
+        return updated;
+      });
+
+      // Notify parent if callback exists
+      if (onRequestValueEdit) {
+        onRequestValueEdit(path, newValue);
+      }
+    },
+    [onRequestValueEdit],
+  );
+
   const contextFields = useMemo(
     () => Array.from(contextFieldMappings.keys()),
     [contextFieldMappings],
@@ -1370,6 +1487,21 @@ function WorkflowMindMapInner({
       });
     },
     [],
+  );
+
+  const handleArrayValueEdit = useCallback(
+    (path: string, newValue: string) => {
+      setEditedRequestValues((prev) => {
+        const updated = new Map(prev);
+        updated.set(path, newValue);
+        return updated;
+      });
+
+      if (onRequestValueEdit) {
+        onRequestValueEdit(path, newValue);
+      }
+    },
+    [onRequestValueEdit],
   );
 
   useEffect(() => {
@@ -1431,6 +1563,7 @@ function WorkflowMindMapInner({
               selectedItems:
                 arraySelections.get(`request-${field.path}`) || new Map(),
               onSelectionChange: handleArraySelectionChange,
+              onValueEdit: handleArrayValueEdit,
             },
           });
           requestY += 200 + field.items.length * 30;
@@ -1457,6 +1590,7 @@ function WorkflowMindMapInner({
               category: "request",
               isOverride,
               isArray: true,
+              editedValue: editedRequestValues.get(field.path),
             },
           });
           requestY += 120;
@@ -1476,6 +1610,7 @@ function WorkflowMindMapInner({
               type: field.type,
               category: "request",
               isOverride,
+              editedValue: editedRequestValues.get(field.path),
             },
           });
           requestY += 100;
@@ -1632,11 +1767,11 @@ function WorkflowMindMapInner({
 
     setNodes(allNodes);
 
-    setTimeout(() => {
-      if (allNodes.length > 0) {
-        reactFlowInstance.fitView({ padding: 0.2 });
-      }
-    }, 100);
+    if (allNodes.length > 0 && nodes.length === 0) {
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 0 });
+      }, 100);
+    }
   }, [
     parsedRequest,
     parsedResponse,
@@ -1646,6 +1781,8 @@ function WorkflowMindMapInner({
     stepIndex,
     arraySelections,
     handleArraySelectionChange,
+    handleArrayValueEdit,
+    editedRequestValues,
   ]);
 
   const onConnect = useCallback(
@@ -1788,6 +1925,7 @@ function WorkflowMindMapInner({
       })
       .map(([nodeId]) => nodes.find((n) => n.id === nodeId))
       .filter(Boolean);
+    console.log(arrayNodesWithSelections);
 
     // Get regular selected nodes (non-array nodes)
     const regularSelectedNodes = nodes.filter(
@@ -1820,7 +1958,7 @@ function WorkflowMindMapInner({
         if (firstItem) {
           const defaultConfig: OverrideFieldConfig = {
             field: firstItem.key.toLowerCase().replace(/\s+/g, "_"),
-            value: `request.${firstItem.path}`,
+            value: `${firstItem.value}`,
             actual_mapping: firstItem.path,
             type: detectDataType(firstItem.value) || "string",
             required: true,
@@ -2015,7 +2153,7 @@ function WorkflowMindMapInner({
 
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
-    const requestMapper: Record<string, string> = {};
+    const requestMapper: Record<string, any> = {}; // Can hold both strings and objects
     const overriddenRequestBody: Array<{
       field: string;
       value: string;
@@ -2057,7 +2195,11 @@ function WorkflowMindMapInner({
       }
     });
 
-    // Request mapper - store paths as values
+    // Separate collections for regular fields and array fields for request mapper
+    const regularFields: Record<string, string> = {};
+    const additionalFields: Array<{ Key: string; Value: string }> = [];
+
+    // Request mapper - store paths as values or edited values
     // For regular request-response connections
     edges.forEach((edge) => {
       if (
@@ -2075,12 +2217,29 @@ function WorkflowMindMapInner({
           // Format the path without brackets (using dots)
           sourcePath = sourcePath.replace(/\[/g, ".").replace(/\]/g, "");
 
-          requestMapper[tgtKey] = sourcePath;
+          // Check if this is from an array node or should go to Additional_Fields
+          const isArrayField =
+            tgtKey.toLowerCase().includes("limit") ||
+            tgtKey.toLowerCase().includes("additional") ||
+            tgtKey.toLowerCase().includes("field") ||
+            srcNode.type === "arrayObjectNode" ||
+            srcNode.data?.isArray === true;
+
+          if (isArrayField) {
+            // Add to Additional_Fields array
+            additionalFields.push({
+              Key: tgtKey,
+              Value: `{{accumulated.${sourcePath}}}`,
+            });
+          } else {
+            // Add as regular field
+            regularFields[tgtKey] = `{{${sourcePath}}}`;
+          }
         }
       }
     });
 
-    // For array request items (from selections)
+    // For array request items (from selections) - handle with edited values
     arraySelections.forEach((selections, nodeId) => {
       const node = nodes.find((n) => n.id === nodeId);
       if (node?.data?.category === "request") {
@@ -2089,8 +2248,43 @@ function WorkflowMindMapInner({
           const formattedPath = item.path
             .replace(/\[/g, ".")
             .replace(/\]/g, "");
-          requestMapper[item.key.toLowerCase().replace(/\s+/g, "_")] =
-            formattedPath;
+
+          // Check if this field has an edited value
+          const editedValue = editedRequestValues.get(item.path);
+
+          // Use edited value if available, otherwise use the path reference
+          if (editedValue !== undefined) {
+            // This is a static value, not a reference
+            const isArrayField =
+              item.key.toLowerCase().includes("limit") ||
+              item.key.toLowerCase().includes("additional") ||
+              item.key.toLowerCase().includes("field");
+
+            if (isArrayField) {
+              additionalFields.push({
+                Key: item.key.toLowerCase().replace(/\s+/g, "_"),
+                Value: editedValue,
+              });
+            } else {
+              regularFields[item.key.toLowerCase().replace(/\s+/g, "_")] =
+                editedValue;
+            }
+          } else {
+            const fieldKey = item.key.toLowerCase().replace(/\s+/g, "_");
+            const isArrayField =
+              fieldKey.includes("limit") ||
+              fieldKey.includes("additional") ||
+              fieldKey.includes("field");
+
+            if (isArrayField) {
+              additionalFields.push({
+                Key: fieldKey,
+                Value: `{{${formattedPath}}}`,
+              });
+            } else {
+              regularFields[fieldKey] = `{{${formattedPath}}}`;
+            }
+          }
         });
       }
     });
@@ -2112,12 +2306,100 @@ function WorkflowMindMapInner({
         ...(config.pattern && { pattern: config.pattern }),
       });
 
-      // Add to request mapper as well
+      // Format the actual_mapping to use dots instead of brackets
       const formattedPath = config.actual_mapping
         .replace(/\[/g, ".")
         .replace(/\]/g, "");
-      requestMapper[config.field] = formattedPath;
+
+      // Check if this field has an edited value
+      const editedValue = editedRequestValues.get(config.actual_mapping);
+
+      // Check if this override should go to Additional_Fields
+      const isArrayField =
+        config.field.toLowerCase().includes("limit") ||
+        config.field.toLowerCase().includes("additional") ||
+        config.field.toLowerCase().includes("field");
+
+      if (editedValue !== undefined) {
+        // Use edited value
+        if (isArrayField) {
+          additionalFields.push({
+            Key: config.field,
+            Value: editedValue,
+          });
+        } else {
+          regularFields[config.field] = editedValue;
+        }
+      } else {
+        // Use reference
+        if (isArrayField) {
+          additionalFields.push({
+            Key: config.field,
+            Value: `{{${formattedPath}}}`,
+          });
+        } else {
+          regularFields[config.field] = `{{${formattedPath}}}`;
+        }
+      }
     });
+
+    // Process regular request fields that aren't connected via edges but have edited values
+    nodes.forEach((node) => {
+      if (
+        node.data?.category === "request" &&
+        node.type === "fieldNode" &&
+        !node.data.isArray
+      ) {
+        const fieldKey = node.data.renamedTo || node.data.key;
+        const editedValue = editedRequestValues.get(fieldKey);
+
+        if (editedValue !== undefined) {
+          // Check if this is an array field
+          const isArrayField =
+            fieldKey.toLowerCase().includes("limit") ||
+            fieldKey.toLowerCase().includes("additional") ||
+            fieldKey.toLowerCase().includes("field");
+
+          if (isArrayField) {
+            // Check if already in additionalFields
+            const exists = additionalFields.some((f) => f.Key === fieldKey);
+            if (!exists) {
+              additionalFields.push({
+                Key: fieldKey,
+                Value: editedValue,
+              });
+            }
+          } else {
+            // Add to regular fields if not already present
+            if (!regularFields[fieldKey]) {
+              regularFields[fieldKey] = editedValue;
+            }
+          }
+        }
+      }
+    });
+
+    // ============ PAYMENT STEP SPECIFIC AUTO-CONFIGURATION ============
+    if (stepName === "PAYMENT") {
+      // Always add Debit_Account_Number to regularFields
+      regularFields["Debit_Account_Number"] = "{{Debit_Account_Number}}";
+
+      // Always add Debit_Account_Number to overriddenRequestBody if not already present
+      const debitAccountExists = overriddenRequestBody.some(
+        (item) => item.field === "Debit_Account_Number",
+      );
+
+      if (!debitAccountExists) {
+        overriddenRequestBody.push({
+          field: "Debit_Account_Number",
+          value: "request.Debit_Account_Number",
+          actual_mapping: "Debit_Account_Number",
+          type: "string",
+          required: true,
+        });
+      }
+    }
+    // =================================================================
 
     // Build template structure
     const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
@@ -2137,9 +2419,17 @@ function WorkflowMindMapInner({
       ...(parsedRequest?.body && { body: parsedRequest.body }),
     };
 
+    // Build the final request_mapper
+    const finalRequestMapper: Record<string, any> = { ...regularFields };
+
+    // Add Additional_Fields if there are any
+    if (additionalFields.length > 0) {
+      finalRequestMapper.Additional_Fields = additionalFields;
+    }
+
     // Add request_mapper if not empty
-    if (Object.keys(requestMapper).length > 0) {
-      template.request_mapper = requestMapper;
+    if (Object.keys(finalRequestMapper).length > 0) {
+      template.request_mapper = finalRequestMapper;
     }
 
     // Add response_mapper if not empty
@@ -2167,17 +2457,20 @@ function WorkflowMindMapInner({
 
     // Add static_fields if needed (fields that have hardcoded values)
     const staticFields: Record<string, string> = {};
-    if (parsedRequest?.body) {
-      Object.entries(parsedRequest.body).forEach(([key, value]) => {
-        if (
-          typeof value === "string" &&
-          !value.includes("{{") &&
-          !value.includes("accumulated.")
-        ) {
-          staticFields[key] = value;
-        }
-      });
-    }
+
+    // Add edited values to static_fields
+    editedRequestValues.forEach((value, path) => {
+      // Only add if it's not already in regular fields or additional fields
+      const isInRegular = Object.keys(regularFields).some(
+        (key) => regularFields[key] === value,
+      );
+      const isInAdditional = additionalFields.some((f) => f.Value === value);
+
+      if (!isInRegular && !isInAdditional) {
+        const key = path.split(".").pop() || path;
+        staticFields[key] = value;
+      }
+    });
 
     if (Object.keys(staticFields).length > 0) {
       template.static_fields = staticFields;
@@ -2217,6 +2510,7 @@ function WorkflowMindMapInner({
     arraySelections,
     parsedRequest,
     stepName,
+    editedRequestValues,
   ]);
 
   const handleExport = useCallback(() => {
@@ -2247,51 +2541,12 @@ function WorkflowMindMapInner({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-violet-600 rounded-lg text-white shadow-lg">
             <GitBranch className="w-4 h-4" />
-
             {stepName && (
               <span className="px-2 py-0.5 bg-white/20 rounded text-xs font-medium">
                 {stepName}
               </span>
             )}
           </div>
-
-          {/* <div className="h-6 w-px bg-gray-300" /> */}
-
-          {/* <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-            <button
-              onClick={() => setLayoutMode("vertical")}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-                layoutMode === "vertical"
-                  ? "bg-white text-purple-700 shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-              title="Vertical layout"
-            >
-              <Layers className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setLayoutMode("horizontal")}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-                layoutMode === "horizontal"
-                  ? "bg-white text-purple-700 shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-              title="Horizontal layout"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setLayoutMode("focus")}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-                layoutMode === "focus"
-                  ? "bg-white text-purple-700 shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-              title="Focus mode"
-            >
-              <Focus className="w-3.5 h-3.5" />
-            </button>
-          </div> */}
 
           <div className="h-6 w-px bg-gray-300" />
 
@@ -2357,9 +2612,9 @@ function WorkflowMindMapInner({
             Add Response
           </button>
 
-          <div className="h-5 w-px bg-gray-200" />
-
-          {/* <button
+          {/* <div className="h-5 w-px bg-gray-200" /> */}
+          {/* 
+          <button
             onClick={handleAutoLayout}
             disabled={isEmpty}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
@@ -2377,9 +2632,9 @@ function WorkflowMindMapInner({
             Fit
           </button> */}
 
-          {/* <div className="h-6 w-px bg-gray-300" />
+          {/* <div className="h-6 w-px bg-gray-300" /> */}
 
-          <button
+          {/* <button
             onClick={handleCopyConfig}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
           >
@@ -2389,9 +2644,9 @@ function WorkflowMindMapInner({
               <Copy className="w-4 h-4" />
             )}
             {copied ? "Copied!" : "Copy Config"}
-          </button>
+          </button> */}
 
-          <button
+          {/* <button
             onClick={handleExport}
             disabled={isEmpty}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 font-medium shadow-lg"
@@ -2424,7 +2679,9 @@ function WorkflowMindMapInner({
         <div className="ml-auto flex items-center gap-4 text-gray-400">
           <span>Select field + click button to mark</span>
           <span>•</span>
-          <span>Double-click to rename</span>
+          <span>Double-click field name to rename</span>
+          <span>•</span>
+          <span>Double-click value to edit</span>
           <span>•</span>
           <span>Drag handles to connect</span>
         </div>
@@ -2600,13 +2857,31 @@ function WorkflowMindMapInner({
             )}
 
             {(contextFieldMappings.size > 0 ||
-              overrideFieldConfigs.size > 0) && (
+              overrideFieldConfigs.size > 0 ||
+              editedRequestValues.size > 0) && (
               <Panel position="bottom-right" className="!m-4">
                 <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border p-4 max-w-sm">
                   <div className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                     <FileJson className="w-4 h-4 text-purple-500" />
                     Generated Config
                   </div>
+
+                  {editedRequestValues.size > 0 && (
+                    <div className="mb-3">
+                      <div className="text-xs font-medium text-blue-600 mb-1">
+                        Edited Values:
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-2 text-xs font-mono max-h-24 overflow-y-auto">
+                        {Array.from(editedRequestValues.entries()).map(
+                          ([path, value]) => (
+                            <div key={path} className="text-gray-700">
+                              &quot;{path}&quot;: &quot;{value}&quot;
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {contextFieldMappings.size > 0 && (
                     <div className="mb-3">
