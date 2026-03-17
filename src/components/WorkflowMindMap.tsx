@@ -1154,7 +1154,9 @@ function WorkflowMindMapInner({
     useState<OverrideFieldConfig | null>(null);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [showManualInputModal, setShowManualInputModal] = useState(false);
-  const [manualInputType, setManualInputType] = useState<"request" | "response">("request");
+  const [manualInputType, setManualInputType] = useState<
+    "request" | "response"
+  >("request");
   const [manualJsonInput, setManualJsonInput] = useState("");
   const [manualJsonError, setManualJsonError] = useState("");
   const reactFlowInstance = useReactFlow();
@@ -1278,7 +1280,7 @@ function WorkflowMindMapInner({
 
   const handleManualJsonSubmit = useCallback(() => {
     setManualJsonError("");
-    
+
     try {
       if (!manualJsonInput.trim()) {
         setManualJsonError("Please enter JSON data");
@@ -1293,9 +1295,9 @@ function WorkflowMindMapInner({
           method: "POST",
           url: "manual-input",
           headers: {},
-          body: parsedData
+          body: parsedData,
         };
-        
+
         if (onManualRequestAdd) {
           onManualRequestAdd(requestData);
         }
@@ -1311,7 +1313,12 @@ function WorkflowMindMapInner({
     } catch (error) {
       setManualJsonError("Invalid JSON format. Please check your syntax.");
     }
-  }, [manualJsonInput, manualInputType, onManualRequestAdd, onManualResponseAdd]);
+  }, [
+    manualJsonInput,
+    manualInputType,
+    onManualRequestAdd,
+    onManualResponseAdd,
+  ]);
 
   const contextFields = useMemo(
     () => Array.from(contextFieldMappings.keys()),
@@ -2240,7 +2247,7 @@ function WorkflowMindMapInner({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-violet-600 rounded-lg text-white shadow-lg">
             <GitBranch className="w-4 h-4" />
-            <span className="font-semibold text-sm">Workflow Canvas</span>
+
             {stepName && (
               <span className="px-2 py-0.5 bg-white/20 rounded text-xs font-medium">
                 {stepName}
@@ -2248,9 +2255,9 @@ function WorkflowMindMapInner({
             )}
           </div>
 
-          <div className="h-6 w-px bg-gray-300" />
+          {/* <div className="h-6 w-px bg-gray-300" /> */}
 
-          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+          {/* <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => setLayoutMode("vertical")}
               className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
@@ -2284,7 +2291,7 @@ function WorkflowMindMapInner({
             >
               <Focus className="w-3.5 h-3.5" />
             </button>
-          </div>
+          </div> */}
 
           <div className="h-6 w-px bg-gray-300" />
 
@@ -2352,25 +2359,25 @@ function WorkflowMindMapInner({
 
           <div className="h-5 w-px bg-gray-200" />
 
-          <button
+          {/* <button
             onClick={handleAutoLayout}
             disabled={isEmpty}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
           >
             <RefreshCw className="w-4 h-4" />
             Layout
-          </button>
+          </button> */}
 
-          <button
+          {/* <button
             onClick={() => reactFlowInstance.fitView({ padding: 0.2 })}
             disabled={isEmpty}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
           >
             <Maximize2 className="w-4 h-4" />
             Fit
-          </button>
+          </button> */}
 
-          <div className="h-6 w-px bg-gray-300" />
+          {/* <div className="h-6 w-px bg-gray-300" />
 
           <button
             onClick={handleCopyConfig}
@@ -2391,7 +2398,7 @@ function WorkflowMindMapInner({
           >
             <Download className="w-4 h-4" />
             Export
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -2432,7 +2439,8 @@ function WorkflowMindMapInner({
                 No data to visualize
               </p>
               <p className="text-sm text-gray-400 mt-2">
-                Parse a cURL command, paste a response, or use the Add Request/Response buttons to see fields.
+                Parse a cURL command, paste a response, or use the Add
+                Request/Response buttons to see fields.
               </p>
             </div>
           </div>
@@ -2666,11 +2674,18 @@ function WorkflowMindMapInner({
 
       {/* Manual JSON Input Modal */}
       {showManualInputModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowManualInputModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowManualInputModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">
-                Add Manual {manualInputType === "request" ? "Request" : "Response"} JSON
+                Add Manual{" "}
+                {manualInputType === "request" ? "Request" : "Response"} JSON
               </h3>
               <button
                 onClick={() => setShowManualInputModal(false)}
@@ -2708,8 +2723,8 @@ function WorkflowMindMapInner({
                 value={manualJsonInput}
                 onChange={(e) => setManualJsonInput(e.target.value)}
                 placeholder={`Paste your ${manualInputType} JSON here...\nExample: ${
-                  manualInputType === "request" 
-                    ? '{"field1": "value1", "field2": "value2"}' 
+                  manualInputType === "request"
+                    ? '{"field1": "value1", "field2": "value2"}'
                     : '{"status": "success", "data": {...}}'
                 }`}
                 className="w-full h-64 p-4 font-mono text-sm bg-gray-900 text-green-400 rounded-lg border border-gray-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none"
@@ -2726,7 +2741,10 @@ function WorkflowMindMapInner({
               <div className="text-xs text-gray-500 mt-2">
                 <p className="font-medium">Tips:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>For request: You can provide just the body object, or a full request with method, url, headers, and body</li>
+                  <li>
+                    For request: You can provide just the body object, or a full
+                    request with method, url, headers, and body
+                  </li>
                   <li>For response: Provide the complete response object</li>
                   <li>Make sure your JSON is valid</li>
                 </ul>

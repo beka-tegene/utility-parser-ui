@@ -135,7 +135,7 @@ export function StepSelector({
   return (
     <div className={`flex items-center ${className}`}>
       {/* Step tabs */}
-      <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1.5">
+      <div className="flex items-center gap-1">
         {stepList.map((step, idx) => {
           const config = STEP_CONFIG[step.name] || STEP_CONFIG.TOKEN;
           const Icon = config.icon;
@@ -146,7 +146,7 @@ export function StepSelector({
             <div key={step.name} className="flex items-center">
               <button
                 onClick={() => onStepChange(step.index)}
-                className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                className={`relative flex items-center gap-2 px-4 py-1 rounded transition-all duration-200 ${
                   isActive
                     ? `${config.activeBg} ${config.borderColor} border-2 shadow-md`
                     : `${config.bgColor} border border-transparent ${config.hoverBg}`
@@ -158,10 +158,10 @@ export function StepSelector({
                 </div>
 
                 {/* Icon */}
-                <Icon className={`w-4 h-4 ${config.textColor}`} />
+                <Icon className={`w-3 h-3 ${config.textColor}`} />
 
                 {/* Step name */}
-                <span className={`text-sm font-semibold ${config.textColor}`}>
+                <span className={`text-xs font-semibold ${config.textColor}`}>
                   {step.name}
                 </span>
               </button>

@@ -1141,8 +1141,8 @@ export function RequestResponseMapper() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Map className="w-5 h-5 text-purple-600" />
-              <h2 className="text-lg font-semibold text-gray-800">
+              <Map className="w-4 h-4 text-purple-600" />
+              <h2 className="text-sm font-semibold text-gray-800">
                 Request/Response Mapper
               </h2>
             </div>
@@ -1208,9 +1208,9 @@ export function RequestResponseMapper() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2 p-4 py-6">
-          <label htmlFor="">
-            <span>Collection Name</span>
+        <div className="grid grid-cols-3 gap-2 py-2">
+          <label htmlFor="" className="-space-y-0.5">
+            <span className="text-sm">Collection Name</span>
             <input
               type="text"
               value={collectionName}
@@ -1219,8 +1219,8 @@ export function RequestResponseMapper() {
               className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
             />
           </label>
-          <label htmlFor="">
-            <span>Template Code (unique identifier)</span>
+          <label htmlFor="" className="-space-y-0.5">
+            <span className="text-sm">Template Code (unique identifier)</span>
             <input
               type="text"
               value={parserCode}
@@ -1229,8 +1229,8 @@ export function RequestResponseMapper() {
               className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
             />
           </label>
-          <label htmlFor="">
-            <span>Description</span>
+          <label htmlFor="" className="-space-y-0.5">
+            <span className="text-sm">Description</span>
             <input
               type="text"
               value={description}
@@ -1243,7 +1243,7 @@ export function RequestResponseMapper() {
       </div>
 
       {/* Step Selector Bar */}
-      <div className="bg-white border-b px-6 py-3">
+      <div className="bg-white border-b px-6 py-2">
         <StepSelector
           templateCode={templateCode}
           steps={WORKFLOW_STEPS}
