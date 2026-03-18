@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import ReactFlow, {
   Node,
   Edge,
@@ -1238,9 +1238,16 @@ function WorkflowMindMapInner({
   const [contextFieldMappings, setContextFieldMappings] = useState<
     Map<string, string>
   >(() => new Map(Object.entries(initialContextMappings)));
+
   const [overrideFieldConfigs, setOverrideFieldConfigs] = useState<
     Map<string, OverrideFieldConfig>
   >(() => new Map(Object.entries(initialOverrideConfigs)));
+
+  // Add effect to update when props change (when switching steps)
+  useEffect(() => {
+    setContextFieldMappings(new Map(Object.entries(initialContextMappings)));
+    setOverrideFieldConfigs(new Map(Object.entries(initialOverrideConfigs)));
+  }, [initialContextMappings, initialOverrideConfigs]);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("vertical");
@@ -1454,13 +1461,37 @@ function WorkflowMindMapInner({
       type: detectDataType(value),
     }));
   }, [inheritedContext]);
+  // Use a ref to track if this is the first render
+  const isFirstRender = useRef(true);
+  const prevStateRef = useRef<string>("");
 
   useEffect(() => {
-    if (onCanvasStateChange) {
-      onCanvasStateChange({
-        contextFieldMappings: Object.fromEntries(contextFieldMappings),
-        overrideFieldConfigs: Object.fromEntries(overrideFieldConfigs),
-      });
+    if (!onCanvasStateChange) return;
+
+    // Skip the first render to prevent infinite loop
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Create current state string for comparison
+    const currentState = JSON.stringify({
+      contextFieldMappings: Object.fromEntries(contextFieldMappings),
+      overrideFieldConfigs: Object.fromEntries(overrideFieldConfigs),
+    });
+
+    // Only call if state actually changed
+    if (prevStateRef.current !== currentState) {
+      prevStateRef.current = currentState;
+
+      const timeoutId = setTimeout(() => {
+        onCanvasStateChange({
+          contextFieldMappings: Object.fromEntries(contextFieldMappings),
+          overrideFieldConfigs: Object.fromEntries(overrideFieldConfigs),
+        });
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [contextFieldMappings, overrideFieldConfigs, onCanvasStateChange]);
 

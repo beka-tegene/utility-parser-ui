@@ -7,7 +7,13 @@ import { StepSelector } from "./StepSelector";
 import { SetupStepEditor } from "./SetupStepEditor";
 import { HistoryControls } from "./HistoryControls";
 import { useAppStore } from "@/lib/store";
-import type { StepCurlData, PayableItem, OverrideFieldConfig } from "@/types";
+import type {
+  StepCurlData,
+  PayableItem,
+  OverrideFieldConfig,
+  ExtendedStepCurlData,
+} from "@/types";
+import type { Node, Edge } from "reactflow";
 import {
   Terminal,
   Play,
@@ -40,7 +46,6 @@ import {
   Undo2,
   Redo2,
 } from "lucide-react";
-import { useEdgesState, useNodesState } from "reactflow";
 
 interface StepData {
   step: string;
@@ -122,6 +127,63 @@ export function RequestResponseMapper() {
   const [stepResponses, setStepResponses] = useState<
     Record<number, Record<string, unknown> | null>
   >({});
+
+  // ============ STEP-SPECIFIC NODES AND EDGES ============
+  const [stepNodes, setStepNodes] = useState<Record<number, Node[]>>({});
+  const [stepEdges, setStepEdges] = useState<Record<number, Edge[]>>({});
+
+  // Get current step's nodes and edges
+  const nodes = stepNodes[activeStepIndex] || [];
+  const edges = stepEdges[activeStepIndex] || [];
+
+  // Safe setter for nodes
+  const setNodes = useCallback(
+    (nodesOrUpdater: Node[] | ((prev: Node[]) => Node[])) => {
+      setStepNodes((prev) => {
+        const currentNodes = prev[activeStepIndex] || [];
+        const newNodes =
+          typeof nodesOrUpdater === "function"
+            ? nodesOrUpdater(currentNodes)
+            : nodesOrUpdater;
+        return {
+          ...prev,
+          [activeStepIndex]: newNodes,
+        };
+      });
+    },
+    [activeStepIndex],
+  );
+
+  // Safe setter for edges
+  const setEdges = useCallback(
+    (edgesOrUpdater: Edge[] | ((prev: Edge[]) => Edge[])) => {
+      setStepEdges((prev) => {
+        const currentEdges = prev[activeStepIndex] || [];
+        const newEdges =
+          typeof edgesOrUpdater === "function"
+            ? edgesOrUpdater(currentEdges)
+            : edgesOrUpdater;
+        return {
+          ...prev,
+          [activeStepIndex]: newEdges,
+        };
+      });
+    },
+    [activeStepIndex],
+  );
+
+  // Simple node change handler (you may need to implement proper logic)
+  const onNodesChange = useCallback((changes: any) => {
+    // This is a simplified version - you might need proper implementation
+    console.log("Nodes changed", changes);
+  }, []);
+
+  // Simple edge change handler
+  const onEdgesChange = useCallback((changes: any) => {
+    // This is a simplified version - you might need proper implementation
+    console.log("Edges changed", changes);
+  }, []);
+  // ======================================================
 
   // Current step's cURL input (computed from stepCurlInputs)
   const curlInput = stepCurlInputs[activeStepIndex] || "";
@@ -270,6 +332,7 @@ export function RequestResponseMapper() {
     updateStepCurlData,
     updateAccumulatedContext,
     saveSnapshot,
+    clearAllStorage,
   } = useAppStore();
 
   // Current step info
@@ -287,6 +350,26 @@ export function RequestResponseMapper() {
   useEffect(() => {
     setCurrentStepName(currentStep?.name || "");
   }, [activeStepIndex, currentStep?.name]);
+
+  // Load step data when step changes
+  useEffect(() => {
+    const stepData = multiStepData[templateCode]?.steps?.[activeStepIndex];
+    if (stepData) {
+      // Load the saved nodes and edges for this step
+      if (stepData.nodes) {
+        setStepNodes((prev) => ({
+          ...prev,
+          [activeStepIndex]: stepData.nodes || [],
+        }));
+      }
+      if (stepData.edges) {
+        setStepEdges((prev) => ({
+          ...prev,
+          [activeStepIndex]: stepData.edges || [],
+        }));
+      }
+    }
+  }, [activeStepIndex, templateCode, multiStepData]);
 
   // Get inherited context from previous steps
   const inheritedContext = useMemo(() => {
@@ -308,25 +391,92 @@ export function RequestResponseMapper() {
   const currentStepData = multiStepData[templateCode]?.steps?.[activeStepIndex];
   const initialContextMappings = currentStepData?.contextFieldMappings || {};
   const initialOverrideConfigs = currentStepData?.overrideFieldConfigs || {};
-  const [nodes] = useNodesState([]);
-  const [edges] = useEdgesState([]);
 
-  // Handle canvas state changes - persist to store
+  // Replace the current single overrideConfigs with step-specific version
+  const [stepOverrideConfigs, setStepOverrideConfigs] = useState<
+    Record<number, Record<string, OverrideFieldConfig>>
+  >({});
+
+  // Get current step's override configs
+  const overrideConfigs = stepOverrideConfigs[activeStepIndex] || {};
+
+  // Safe setter for override configs
+  const setOverrideConfigs = useCallback(
+    (
+      value:
+        | Record<string, OverrideFieldConfig>
+        | ((
+            prev: Record<string, OverrideFieldConfig>,
+          ) => Record<string, OverrideFieldConfig>),
+    ) => {
+      setStepOverrideConfigs((prev) => {
+        const current = prev[activeStepIndex] || {};
+        const newValue = typeof value === "function" ? value(current) : value;
+        return {
+          ...prev,
+          [activeStepIndex]: newValue,
+        };
+      });
+    },
+    [activeStepIndex],
+  );
+  // Replace the current single contextMappings with step-specific version
+  const [stepContextMappings, setStepContextMappings] = useState<
+    Record<number, Record<string, string>>
+  >({});
+
+  // Get current step's context mappings
+  const contextMappings = stepContextMappings[activeStepIndex] || {};
+
+  // Safe setter for context mappings
+  const setContextMappings = useCallback(
+    (
+      value:
+        | Record<string, string>
+        | ((prev: Record<string, string>) => Record<string, string>),
+    ) => {
+      setStepContextMappings((prev) => {
+        const current = prev[activeStepIndex] || {};
+        const newValue = typeof value === "function" ? value(current) : value;
+        return {
+          ...prev,
+          [activeStepIndex]: newValue,
+        };
+      });
+    },
+    [activeStepIndex],
+  );
+
+  // Handle canvas state changes - persist to store with nodes and edges
   const handleCanvasStateChange = useCallback(
     (state: {
       contextFieldMappings: Record<string, string>;
       overrideFieldConfigs: Record<string, OverrideFieldConfig>;
     }) => {
       if (templateCode) {
+        // Update local step-specific state
+        setContextMappings(state.contextFieldMappings);
+        setOverrideConfigs(state.overrideFieldConfigs);
+
+        // Save to store
         updateStepCurlData(templateCode, activeStepIndex, {
           contextFieldMappings: state.contextFieldMappings,
           overrideFieldConfigs: state.overrideFieldConfigs,
+          nodes: stepNodes[activeStepIndex] || [],
+          edges: stepEdges[activeStepIndex] || [],
         });
       }
     },
-    [templateCode, activeStepIndex, updateStepCurlData],
+    [
+      templateCode,
+      activeStepIndex,
+      updateStepCurlData,
+      stepNodes,
+      stepEdges,
+      setContextMappings,
+      setOverrideConfigs,
+    ],
   );
-
   // Handle step change
   const handleStepChange = useCallback((index: number) => {
     setActiveStepIndex(index);
@@ -406,36 +556,6 @@ export function RequestResponseMapper() {
           : newRequestData,
       }));
 
-      // Execute the request
-      setIsExecuting(true);
-
-      const urlEncodedBody = bodyObj
-        ? new URLSearchParams(bodyObj as Record<string, string>).toString()
-        : undefined;
-
-      // const res = await fetch(parsed.url, {
-      //   method: finalMethod,
-      //   headers: parsed.headers,
-      //   body: urlEncodedBody,
-      // });
-
-      // const contentType = res.headers.get("content-type");
-      // let responseData: Record<string, unknown>;
-
-      // if (contentType?.includes("application/json")) {
-      //   responseData = await res.json();
-      // } else {
-      //   responseData = { _raw: await res.text() };
-      // }
-
-      // MERGE response with existing data
-      // setStepResponses((prev) => ({
-      //   ...prev,
-      //   [activeStepIndex]: prev[activeStepIndex]
-      //     ? { ...prev[activeStepIndex], ...responseData }
-      //     : responseData,
-      // }));
-
       setIsExecuting(false);
 
       // Add to workflow steps
@@ -451,24 +571,8 @@ export function RequestResponseMapper() {
         timestamp: new Date().toISOString(),
       };
 
-      // Update accumulated context based on marked fields
-      const newAccumulated = { ...workflowContext.accumulated };
-      contextFields.forEach((fieldPath) => {
-        // Extract the value from response
-        const parts = fieldPath.replace("response.", "").split(".");
-        let value: unknown = {};
-        for (const part of parts) {
-          if (value && typeof value === "object") {
-            value = (value as Record<string, unknown>)[part];
-          }
-        }
-        if (value !== undefined) {
-          newAccumulated[parts.join(".")] = value;
-        }
-      });
-
       setWorkflowContext((prev) => ({
-        accumulated: newAccumulated,
+        accumulated: prev.accumulated,
         steps: [...prev.steps, newStep],
       }));
     } catch (e) {
@@ -483,6 +587,7 @@ export function RequestResponseMapper() {
     currentStepName,
     workflowContext.accumulated,
     contextFields,
+    activeStepIndex,
   ]);
 
   // Execute request
@@ -556,29 +661,6 @@ export function RequestResponseMapper() {
       setIsExecuting(false);
     }
   };
-
-  // Handle field marking from mind map
-  const handleFieldMappingChange = useCallback(
-    (mappings: {
-      contextFields: string[];
-      responseFields: string[];
-      fieldMappings: Record<string, string>;
-    }) => {
-      setContextFields(new Set(mappings.contextFields));
-      setResponseFields(new Set(mappings.responseFields));
-
-      // Convert to field mappings
-      const newMappings: FieldMapping[] = Object.entries(
-        mappings.fieldMappings,
-      ).map(([target, source]) => ({
-        source,
-        target,
-        type: "passthrough" as const,
-      }));
-      setFieldMappings((prev) => [...prev, ...newMappings]);
-    },
-    [],
-  );
 
   // Handle manual request addition
   const handleManualRequestAdd = useCallback(
@@ -656,6 +738,7 @@ export function RequestResponseMapper() {
   };
 
   // Reset workflow
+  // Reset workflow
   const handleResetWorkflow = () => {
     setWorkflowContext({ accumulated: {}, steps: [] });
     setContextFields(new Set());
@@ -669,19 +752,22 @@ export function RequestResponseMapper() {
     setShowResponseInput(false);
     setManualRequests({});
     setManualResponses({});
+    setStepNodes({});
+    setStepEdges({});
+    setStepOverrideConfigs({}); // Reset override configs
+    setStepContextMappings({}); // Reset context mappings
   };
 
-
-  const clearAllStorage = useAppStore((state) => state.clearAllStorage);
-  
   const handleClear = () => {
-    if (confirm("Are you sure you want to clear all saved data? This cannot be undone.")) {
+    if (
+      confirm(
+        "Are you sure you want to clear all saved data? This cannot be undone.",
+      )
+    ) {
       clearAllStorage();
-      // Optionally reload the page
       window.location.reload();
     }
   };
-  const [allData, setAllData] = useState<any[]>([]);
 
   // Export workflow configuration
   const handleExportConfig = () => {
@@ -692,7 +778,7 @@ export function RequestResponseMapper() {
     // Generate templates for all steps
     const generatedTemplates: Record<string, unknown>[] = [];
 
-    // Iterate through all steps (use steps.length instead of hardcoded 3)
+    // Iterate through all steps
     steps.forEach((step, index) => {
       const currentStepData = step;
       const initialContextMappings =
@@ -713,14 +799,14 @@ export function RequestResponseMapper() {
         required: boolean;
       }> = [];
 
-      // Response mapper: fields stored in context (original response field -> custom display name)
+      // Response mapper: fields stored in context
       Object.entries(initialContextMappings).forEach(
         ([originalKey, displayName]) => {
           responseMapper[originalKey] = displayName;
         },
       );
 
-      // Override fields - fields that need user input at runtime with full configuration
+      // Override fields
       Object.values(initialOverrideConfigs).forEach((config) => {
         overriddenRequestBody.push({
           field: config.field,
@@ -736,22 +822,6 @@ export function RequestResponseMapper() {
           }),
           ...(config.pattern && { pattern: config.pattern }),
         });
-      });
-
-      // Request mapper - maps accumulated context to request body
-      edges.forEach((edge) => {
-        if (
-          edge.source.startsWith("response-") &&
-          edge.target.startsWith("request-")
-        ) {
-          const srcNode = nodes.find((n) => n.id === edge.source);
-          const tgtNode = nodes.find((n) => n.id === edge.target);
-          if (srcNode && tgtNode) {
-            const srcKey = srcNode.data.renamedTo || srcNode.data.originalKey;
-            const tgtKey = tgtNode.data.renamedTo || tgtNode.data.originalKey;
-            requestMapper[tgtKey] = `accumulated.${srcKey}`;
-          }
-        }
       });
 
       // Determine step progression
@@ -776,7 +846,7 @@ export function RequestResponseMapper() {
           Object.keys(responseMapper).length > 0 ? responseMapper : undefined,
       };
 
-      // Add authorization_mapper if bearer token is detected in headers
+      // Add authorization_mapper if bearer token is detected
       const authHeader =
         parsedRequest?.headers?.["Authorization"] ||
         parsedRequest?.headers?.["authorization"];
@@ -809,14 +879,12 @@ export function RequestResponseMapper() {
       generatedTemplates.push(template);
     });
 
-    // Update state if needed
-
     // Create the final config
     const config = {
       name: collectionName,
       template_code: parserCode,
       description: description,
-      templates: generatedTemplates, // Use generatedTemplates instead of allData
+      templates: generatedTemplates,
       mappings: fieldMappings,
       accumulated: workflowContext.accumulated,
     };
@@ -891,7 +959,7 @@ export function RequestResponseMapper() {
 
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
-    const requestMapper: Record<string, any> = {}; // Can hold both strings and objects
+    const requestMapper: Record<string, any> = {};
     const staticFields: Record<string, string> = {};
     const credentials: Record<string, string> = {};
     const overriddenRequestBody: Array<{
@@ -911,6 +979,14 @@ export function RequestResponseMapper() {
     const contextMappings = currentStepData?.contextFieldMappings || {};
     const overrideConfigs = currentStepData?.overrideFieldConfigs || {};
 
+    const currentContextMappings = contextMappings; // from stepContextMappings
+    const currentOverrideConfigs = overrideConfigs;
+
+    Object.entries(currentContextMappings).forEach(([path, displayName]) => {
+      const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
+      responseMapper[displayName] = formattedKey;
+    });
+
     // Build response mapper from context field mappings
     Object.entries(contextMappings).forEach(([path, displayName]) => {
       const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
@@ -921,59 +997,8 @@ export function RequestResponseMapper() {
     const regularFields: Record<string, string> = {};
     const additionalFields: Array<{ Key: string; Value: string }> = [];
 
-    // Build request mapper from edges (connections between response and request)
-    edges.forEach((edge) => {
-      if (
-        edge.source.startsWith("response-") &&
-        edge.target.startsWith("request-")
-      ) {
-        const srcNode = nodes.find((n) => n.id === edge.source);
-        const tgtNode = nodes.find((n) => n.id === edge.target);
-        if (srcNode && tgtNode) {
-          // Get the target key (request field)
-          const tgtKey = tgtNode.data.renamedTo || tgtNode.data.originalKey;
-
-          // Get the source path (response field)
-          let srcPath = srcNode.data.originalKey || srcNode.data.key;
-
-          // Format path to use dots instead of brackets
-          srcPath = srcPath.replace(/\[/g, ".").replace(/\]/g, "");
-
-          // Check if this is from an array node or should go to Additional_Fields
-          const isArrayField =
-            tgtKey.toLowerCase().includes("limit") ||
-            tgtKey.toLowerCase().includes("additional") ||
-            tgtKey.toLowerCase().includes("field") ||
-            srcNode.type === "arrayObjectNode" ||
-            srcNode.data?.isArray === true;
-
-          if (isArrayField) {
-            // Add to Additional_Fields array
-            additionalFields.push({
-              Key: tgtKey,
-              Value: `{{accumulated.${srcPath}}}`,
-            });
-          } else {
-            // Add as regular field
-            regularFields[tgtKey] = `{{${srcPath}}}`;
-          }
-
-          // Check if this is a static value or a reference
-          if (
-            srcNode.data.value &&
-            typeof srcNode.data.value === "string" &&
-            !srcNode.data.value.includes("{{") &&
-            !srcNode.data.value.includes("accumulated.")
-          ) {
-            staticFields[tgtKey] = srcNode.data.value as string;
-          }
-        }
-      }
-    });
-    console.log(overrideConfigs);
-
     // Build override fields from override configs
-    Object.values(overrideConfigs).forEach((config) => {
+    Object.values(currentOverrideConfigs).forEach((config) => {
       if (currentStepName !== "PAYMENT") {
         overriddenRequestBody.push({
           field: config.field,
@@ -1132,18 +1157,61 @@ export function RequestResponseMapper() {
     templateCode,
     activeStepIndex,
     parserCode,
+    contextMappings, // Add this
+    overrideConfigs,
   ]);
 
   const handleClick = async (event: any) => {
-    event.preventDefault(); // If needed
+    event.preventDefault();
 
     try {
       await handleParseCurl();
-      // handleExecute();
     } catch (error) {
       console.error("Error:", error);
     }
   };
+
+  // Load step data when step changes
+  useEffect(() => {
+    const stepData = multiStepData[templateCode]?.steps?.[activeStepIndex] as
+      | ExtendedStepCurlData
+      | undefined;
+    if (stepData) {
+      // Load context mappings
+      if (stepData.contextFieldMappings) {
+        setContextMappings(stepData.contextFieldMappings);
+      }
+
+      // Load override configs
+      if (stepData.overrideFieldConfigs) {
+        setOverrideConfigs(stepData.overrideFieldConfigs);
+      }
+
+      // Load nodes and edges
+      if (stepData.nodes) {
+        setStepNodes((prev) => ({
+          ...prev,
+          [activeStepIndex]: stepData.nodes || [],
+        }));
+      }
+      if (stepData.edges) {
+        setStepEdges((prev) => ({
+          ...prev,
+          [activeStepIndex]: stepData.edges || [],
+        }));
+      }
+    } else {
+      // Reset to empty if no data
+      setContextMappings({});
+      setOverrideConfigs({});
+    }
+  }, [
+    activeStepIndex,
+    templateCode,
+    multiStepData,
+    setContextMappings,
+    setOverrideConfigs,
+  ]);
 
   return (
     <div className="h-full flex flex-col bg-gray-100">
@@ -1451,7 +1519,7 @@ export function RequestResponseMapper() {
         {/* Main View Area */}
         <div className="flex-1 overflow-y-scroll p-4">
           {/* Inherited Context Display */}
-          {Object.keys(inheritedContext).length > 0 && !isSetupStep && (
+          {/* {Object.keys(inheritedContext).length > 0 && !isSetupStep && (
             <div className="mb-4 p-3 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg border border-violet-200">
               <div className="flex items-center gap-2 mb-2">
                 <Database className="w-4 h-4 text-violet-600" />
@@ -1484,7 +1552,7 @@ export function RequestResponseMapper() {
                 )}
               </div>
             </div>
-          )}
+          )} */}
 
           {/* SETUP Step - Special Editor */}
           {isSetupStep && activeView === "split" && (
@@ -1652,11 +1720,13 @@ export function RequestResponseMapper() {
                 stepName={currentStep?.name}
                 stepIndex={activeStepIndex}
                 inheritedContext={inheritedContext}
-                initialContextMappings={initialContextMappings}
-                initialOverrideConfigs={initialOverrideConfigs}
+                // initialContextMappings={initialContextMappings}
+                // initialOverrideConfigs={initialOverrideConfigs}
                 onCanvasStateChange={handleCanvasStateChange}
                 onManualRequestAdd={handleManualRequestAdd}
                 onManualResponseAdd={handleManualResponseAdd}
+                initialContextMappings={contextMappings} // Use step-specific
+                initialOverrideConfigs={overrideConfigs}
               />
             </div>
           )}
@@ -1693,15 +1763,10 @@ export function RequestResponseMapper() {
                         const parsedConfig = JSON.parse(
                           stepJsonConfigs[activeStepIndex] || "{}",
                         );
-                        // Here you would save it to your state/store for this step
                         console.log(
                           `Saved config for step ${currentStep?.name}:`,
                           parsedConfig,
                         );
-
-                        // You could update the step-specific config in your store
-                        // updateStepConfig(templateCode, activeStepIndex, parsedConfig);
-
                         setJsonSaved(true);
                         setTimeout(() => setJsonSaved(false), 2000);
                       } catch (e) {
