@@ -811,7 +811,7 @@ export function RequestResponseMapper() {
       // Build response mapper from context field mappings
       Object.entries(stepContextMappings).forEach(([path, displayName]) => {
         const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
-        responseMapper[displayName] = formattedKey;
+        responseMapper[displayName] = `{{${formattedKey}}}`;
       });
 
       // Separate collections for regular fields and array fields
@@ -1070,18 +1070,46 @@ export function RequestResponseMapper() {
     const contextMappings = currentStepData?.contextFieldMappings || {};
     const overrideConfigs = currentStepData?.overrideFieldConfigs || {};
 
-    const currentContextMappings = contextMappings; // from stepContextMappings
-    const currentOverrideConfigs = overrideConfigs;
-
-    Object.entries(currentContextMappings).forEach(([path, displayName]) => {
-      const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
-      responseMapper[displayName] = formattedKey;
-    });
-
     // Build response mapper from context field mappings
+    // FIX: Use the actual response value if available, otherwise use reference
     Object.entries(contextMappings).forEach(([path, displayName]) => {
       const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
-      responseMapper[displayName] = formattedKey;
+
+      // Try to get the actual value from the current step's response
+      let actualValue: unknown = null;
+      const currentResponse = stepResponses[activeStepIndex];
+
+      if (currentResponse) {
+        // Navigate through the response object using the path
+        const pathParts = path.split(/[\[\].]/).filter((p) => p);
+        let current: unknown = currentResponse;
+        for (const part of pathParts) {
+          if (
+            current &&
+            typeof current === "object" &&
+            part in (current as Record<string, unknown>)
+          ) {
+            current = (current as Record<string, unknown>)[part];
+          } else {
+            current = null;
+            break;
+          }
+        }
+        actualValue = current;
+      }
+
+      // Check if we found a primitive value (string, number, boolean)
+      if (
+        actualValue !== null &&
+        actualValue !== undefined &&
+        typeof actualValue !== "object"
+      ) {
+        // This is a static value, use it directly without {{}}
+        responseMapper[displayName] = String(actualValue);
+      } else {
+        // This is a reference path, wrap in {{}}
+        responseMapper[displayName] = `{{${formattedKey}}}`;
+      }
     });
 
     // Separate collections for regular fields and array fields
@@ -1089,7 +1117,7 @@ export function RequestResponseMapper() {
     const additionalFields: Array<{ Key: string; Value: string }> = [];
 
     // Build override fields from override configs
-    Object.values(currentOverrideConfigs).forEach((config) => {
+    Object.values(overrideConfigs).forEach((config) => {
       if (currentStepName !== "PAYMENT") {
         overriddenRequestBody.push({
           field: config.field,
@@ -1118,15 +1146,27 @@ export function RequestResponseMapper() {
         config.field.toLowerCase().includes("additional") ||
         config.field.toLowerCase().includes("field");
 
-      if (isArrayField) {
-        // Add to Additional_Fields array
-        additionalFields.push({
-          Key: config.field,
-          Value: `{{${formattedPath}}}`,
-        });
+      // Check if the value is a static value (doesn't start with "request.")
+      if (config.value && !config.value.startsWith("request.")) {
+        // This is a static value, use it directly
+        if (isArrayField) {
+          additionalFields.push({
+            Key: config.field,
+            Value: config.value,
+          });
+        } else {
+          regularFields[config.field] = config.value;
+        }
       } else {
-        // Add as regular field
-        regularFields[config.field] = `{{${config.value}}}`;
+        // This is a reference
+        if (isArrayField) {
+          additionalFields.push({
+            Key: config.field,
+            Value: `{{${formattedPath}}}`,
+          });
+        } else {
+          regularFields[config.field] = `{{${formattedPath}}}`;
+        }
       }
     });
 
@@ -1248,8 +1288,7 @@ export function RequestResponseMapper() {
     templateCode,
     activeStepIndex,
     parserCode,
-    contextMappings, // Add this
-    overrideConfigs,
+    stepResponses, // Add stepResponses to dependencies
   ]);
 
   const handleClick = async (event: any) => {
@@ -1346,7 +1385,7 @@ export function RequestResponseMapper() {
       // Build response mapper from context field mappings
       Object.entries(stepContextMappings).forEach(([path, displayName]) => {
         const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
-        responseMapper[displayName] = formattedKey;
+        responseMapper[displayName] = `{{${formattedKey}}}`;
       });
 
       // Build override fields from override configs
@@ -1646,7 +1685,7 @@ export function RequestResponseMapper() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            {/* <button
               onClick={() => setShowHistory(!showHistory)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 showHistory
@@ -1656,7 +1695,7 @@ export function RequestResponseMapper() {
             >
               <History className="w-3.5 h-3.5" />
               History ({workflowContext.steps.length})
-            </button>
+            </button> */}
 
             <button
               onClick={handleExportConfig}
@@ -2169,10 +2208,6 @@ export function RequestResponseMapper() {
                       try {
                         const parsedConfig = JSON.parse(
                           stepJsonConfigs[activeStepIndex] || "{}",
-                        );
-                        console.log(
-                          `Saved config for step ${currentStep?.name}:`,
-                          parsedConfig,
                         );
                         setJsonSaved(true);
                         setTimeout(() => setJsonSaved(false), 2000);
