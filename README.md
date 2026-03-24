@@ -56,6 +56,7 @@ npm start
 4. Click **Apply to Current Step** to populate the template
 
 Example cURL:
+
 ```bash
 curl -X POST 'https://api.example.com/auth/token' \
   -H 'Content-Type: application/json' \
@@ -73,6 +74,7 @@ curl -X POST 'https://api.example.com/auth/token' \
 ### 4. Table Mapping
 
 For precise control, use the **Request Mapping** or **Response Mapping** tabs:
+
 - Add rows for each field mapping
 - Select source type (request, accumulated, context, credentials, static)
 - Enter the source field path and target field
@@ -80,7 +82,7 @@ For precise control, use the **Request Mapping** or **Response Mapping** tabs:
 ### 5. Test Your Workflow
 
 1. Go to **Test Console** tab
-2. Set the API Base URL (default: http://localhost:8080)
+2. Set the API Base URL (default: https://qaapisuperapp.cbe.com.et/api/v1)
 3. Click **Initialize Test**
 4. Fill in required input fields
 5. Click **Start Workflow** to execute
@@ -97,10 +99,11 @@ For precise control, use the **Request Mapping** or **Response Mapping** tabs:
 ### API Base URL
 
 Set the backend API URL in:
+
 - Header input field (top-right)
 - Test Console settings
 
-Default: `http://localhost:8080`
+Default: `https://qaapisuperapp.cbe.com.et/api/v1`
 
 ### Backend API Endpoints Used
 
