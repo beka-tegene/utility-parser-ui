@@ -1565,7 +1565,7 @@ export function RequestResponseMapper() {
 
     try {
       const response = await fetch(
-        `https://qaapisuperapp.cbe.com.et/api/v1/cbesuperapp/utility/collections/group`,
+        `${apiBaseUrl}/cbesuperapp/utility/collections/group`,
         {
           method: "POST",
           headers: {
