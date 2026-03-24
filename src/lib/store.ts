@@ -60,8 +60,8 @@ interface AppState {
   setActiveTab: (tab: "mapper" | "test" | "collections") => void;
 
   // Collections list
-  collections: Collection[];
-  setCollections: (collections: Collection[]) => void;
+  collections: any[];
+  setCollections: (collections: any[]) => void;
   addCollection: (collection: Collection) => void;
   updateCollection: (id: string, collection: Collection) => void;
   removeCollection: (id: string) => void;
