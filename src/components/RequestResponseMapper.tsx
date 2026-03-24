@@ -45,6 +45,7 @@ import {
   Map,
   Undo2,
   Redo2,
+  X,
 } from "lucide-react";
 
 interface StepData {
@@ -1303,29 +1304,33 @@ export function RequestResponseMapper() {
     setOverrideConfigs,
   ]);
 
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupCode, setGroupCode] = useState("");
+  const [collectionCodes, setCollectionCodes] = useState("");
+  const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
+
   const handleSubmitConfig = async () => {
     const steps = multiStepData[templateCode]?.steps || [];
     const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
 
-    // Generate templates for all steps by calling generateConfig for each step
+    // Generate templates for all steps
     const generatedTemplates: Record<string, unknown>[] = [];
 
     // Iterate through all steps
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      const stepIndex = i;
       const stepName = step.stepName || STEP_ORDER[i] || `STEP_${i + 1}`;
 
       // Get step-specific data
       const stepParsedRequest = step.parsedRequest;
-      const stepParsedResponse = step.parsedResponse;
       const stepContextMappings = step.contextFieldMappings || {};
       const stepOverrideConfigs = step.overrideFieldConfigs || {};
 
       // Build response mapper
       const responseMapper: Record<string, string> = {};
-      const requestMapper: Record<string, any> = {};
-      const staticFields: Record<string, string> = {};
+      const regularFields: Record<string, string> = {};
+      const additionalFields: Array<{ Key: string; Value: string }> = [];
       const credentials: Record<string, string> = {};
       const overriddenRequestBody: Array<{
         field: string;
@@ -1343,10 +1348,6 @@ export function RequestResponseMapper() {
         const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
         responseMapper[displayName] = formattedKey;
       });
-
-      // Separate collections for regular fields and array fields
-      const regularFields: Record<string, string> = {};
-      const additionalFields: Array<{ Key: string; Value: string }> = [];
 
       // Build override fields from override configs
       Object.values(stepOverrideConfigs).forEach((config) => {
@@ -1367,35 +1368,29 @@ export function RequestResponseMapper() {
           });
         }
 
-        // Format the actual_mapping to use dots instead of brackets
         const formattedPath = config.actual_mapping
           .replace(/\[/g, ".")
           .replace(/\]/g, "");
 
-        // Check if this override should go to Additional_Fields
         const isArrayField =
           config.field.toLowerCase().includes("limit") ||
           config.field.toLowerCase().includes("additional") ||
           config.field.toLowerCase().includes("field");
 
         if (isArrayField) {
-          // Add to Additional_Fields array
           additionalFields.push({
             Key: config.field,
             Value: `{{${formattedPath}}}`,
           });
         } else {
-          // Add as regular field
           regularFields[config.field] = `{{${config.value}}}`;
         }
       });
 
       // ============ PAYMENT STEP SPECIFIC AUTO-CONFIGURATION ============
       if (stepName === "PAYMENT") {
-        // Always add Debit_Account_Number to regularFields
         regularFields["Debit_Account_Number"] = "{{Debit_Account_Number}}";
 
-        // Always add Debit_Account_Number to overriddenRequestBody if not already present
         const debitAccountExists = overriddenRequestBody.some(
           (item) => item.field === "Debit_Account_Number",
         );
@@ -1433,7 +1428,7 @@ export function RequestResponseMapper() {
           ? STEP_ORDER[currentStepIdx + 1]
           : "DONE";
 
-      // Build template structure matching the desired format
+      // Build template structure
       const template: Record<string, unknown> = {
         name: stepName || "STEP",
         parser_code: `${parserCode}_${stepName?.toLowerCase()}_v10`,
@@ -1445,24 +1440,20 @@ export function RequestResponseMapper() {
         header_type: stepParsedRequest?.headers || {},
         authorization_mapper: {},
         credentials: credentials,
-        static_fields: staticFields,
+        static_fields: {},
         body: stepParsedRequest?.body || {},
       };
 
       // Build the final request_mapper
       const finalRequestMapper: Record<string, any> = { ...regularFields };
-
-      // Add Additional_Fields if there are any
       if (additionalFields.length > 0) {
         finalRequestMapper.Additional_Fields = additionalFields;
       }
 
-      // Add request_mapper if not empty
       if (Object.keys(finalRequestMapper).length > 0) {
         template.request_mapper = finalRequestMapper;
       }
 
-      // Add response_mapper if not empty
       if (Object.keys(responseMapper).length > 0) {
         template.response_mapper = responseMapper;
       }
@@ -1500,8 +1491,8 @@ export function RequestResponseMapper() {
       generatedTemplates.push(template);
     }
 
-    // Create the final config
-    const config = {
+    // Create the final config for the collection
+    const collectionConfig = {
       name: collectionName,
       template_code: parserCode,
       description: description,
@@ -1511,8 +1502,9 @@ export function RequestResponseMapper() {
     };
 
     try {
-      const response = await fetch(
-        `https://qaapisuperapp.cbe.com.et/api/v1/cbesuperapp/utility/collections`,
+      // First, submit the collection
+      const collectionResponse = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/collections`,
         {
           method: "POST",
           headers: {
@@ -1520,7 +1512,68 @@ export function RequestResponseMapper() {
             Cookie:
               "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
           },
-          body: JSON.stringify(config),
+          body: JSON.stringify(collectionConfig),
+        },
+      );
+
+      if (!collectionResponse.ok) {
+        throw new Error(`HTTP error! status: ${collectionResponse.status}`);
+      }
+
+      const collectionResult = await collectionResponse.json();
+      console.log("Collection created:", collectionResult);
+
+      // Show modal to get group information
+      setShowGroupModal(true);
+    } catch (error) {
+      console.error("Error submitting config:", error);
+      alert(
+        `Failed to submit configuration: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  };
+
+  // Handle group submission
+  const handleSubmitGroup = async () => {
+    if (!groupName.trim() || !groupCode.trim() || !collectionCodes.trim()) {
+      alert("Please fill in all fields");
+      return;
+    }
+
+    setIsSubmittingGroup(true);
+
+    // Parse collection codes (comma-separated or array format)
+    let collectionCodesArray: string[] = [];
+    try {
+      // Try to parse as JSON array first
+      const parsed = JSON.parse(collectionCodes);
+      if (Array.isArray(parsed)) {
+        collectionCodesArray = parsed;
+      } else {
+        collectionCodesArray = [collectionCodes];
+      }
+    } catch {
+      // If not JSON, split by comma
+      collectionCodesArray = collectionCodes.split(",").map((c) => c.trim());
+    }
+
+    const groupData = {
+      group_name: groupName,
+      group_code: groupCode,
+      collection_codes: collectionCodesArray,
+    };
+
+    try {
+      const response = await fetch(
+        `https://qaapisuperapp.cbe.com.et/api/v1/cbesuperapp/utility/collections/group`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie:
+              "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
+          },
+          body: JSON.stringify(groupData),
         },
       );
 
@@ -1529,13 +1582,23 @@ export function RequestResponseMapper() {
       }
 
       const result = await response.json();
-      console.log("Success:", result);
-      alert("Configuration submitted successfully!");
+      console.log("Group created:", result);
+
+      alert("Collection and Group created successfully!");
+      setShowGroupModal(false);
+      setGroupName("");
+      setGroupCode("");
+      setCollectionCodes("");
+
+      // Reset the workflow
+      handleResetWorkflow();
     } catch (error) {
-      console.error("Error submitting config:", error);
+      console.error("Error creating group:", error);
       alert(
-        `Failed to submit configuration: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to create group: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    } finally {
+      setIsSubmittingGroup(false);
     }
   };
 
@@ -1621,7 +1684,7 @@ export function RequestResponseMapper() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2 py-2">
+        <div className="grid grid-cols-4 gap-2 py-2">
           <label htmlFor="" className="-space-y-0.5">
             <span className="text-sm">Collection Name</span>
             <input
@@ -2159,6 +2222,116 @@ export function RequestResponseMapper() {
                   className="w-full h-full font-mono text-xs bg-gray-900 text-green-400 p-4 rounded-lg border border-gray-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none"
                   spellCheck={false}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Group Creation Modal */}
+          {showGroupModal && (
+            <div
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+              onClick={() => setShowGroupModal(false)}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Create Collection Group
+                  </h3>
+                  <button
+                    onClick={() => setShowGroupModal(false)}
+                    className="p-1 hover:bg-gray-100 rounded-lg"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Group Name
+                    </label>
+                    <input
+                      type="text"
+                      value={groupName}
+                      onChange={(e) => setGroupName(e.target.value)}
+                      placeholder="e.g., Travel & Transport"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Display name for the collection group
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Group Code
+                    </label>
+                    <input
+                      type="text"
+                      value={groupCode}
+                      onChange={(e) => setGroupCode(e.target.value)}
+                      placeholder="e.g., Travel_Transport_v0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Unique identifier for the group (no spaces)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Collection Codes
+                    </label>
+                    <textarea
+                      value={collectionCodes}
+                      onChange={(e) => setCollectionCodes(e.target.value)}
+                      placeholder='["GUZOGO", "Ethiopian_Airlines_Ticket"] or GUZOGO, Ethiopian_Airlines_Ticket'
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter collection template codes as JSON array or
+                      comma-separated list
+                    </p>
+                  </div>
+
+                  <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
+                    <p className="font-medium mb-1">📌 Example:</p>
+                    <p className="font-mono text-xs">
+                      JSON: [GUZOGO, Ethiopian_Airlines_Ticket]
+                    </p>
+                    <p className="font-mono text-xs mt-1">
+                      Comma: GUZOGO, Ethiopian_Airlines_Ticket
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-6 border-t mt-4">
+                  <button
+                    onClick={() => setShowGroupModal(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    disabled={isSubmittingGroup}
+                  >
+                    Skip
+                  </button>
+                  <button
+                    onClick={handleSubmitGroup}
+                    disabled={isSubmittingGroup}
+                    className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isSubmittingGroup ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Group"
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}

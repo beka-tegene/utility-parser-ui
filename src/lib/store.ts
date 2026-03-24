@@ -146,7 +146,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ testResponses: [...state.testResponses, response] })),
       clearTestResponses: () => set({ testResponses: [], testToken: null }),
 
-      apiBaseUrl: "http://localhost:8080",
+      apiBaseUrl: "https://qaapisuperapp.cbe.com.et/api/v1",
       setApiBaseUrl: (url) => set({ apiBaseUrl: url }),
 
       activeTab: "mapper",
@@ -393,7 +393,7 @@ export const useAppStore = create<AppState>()(
         set({
           collection: null,
           collections: [],
-          apiBaseUrl: "http://localhost:8080",
+          apiBaseUrl: "https://qaapisuperapp.cbe.com.et/api/v1",
           multiStepData: {},
           requestMappings: [],
           responseMappings: [],
