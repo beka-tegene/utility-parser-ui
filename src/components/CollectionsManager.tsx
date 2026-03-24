@@ -143,7 +143,7 @@ export function CollectionsManager() {
       }
 
       const data = await response.json();
-      setCollections(data.groups || []);
+      setCollections(data || []);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to fetch collections",
