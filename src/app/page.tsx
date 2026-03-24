@@ -8,6 +8,7 @@ import { Play, FolderOpen, Settings, Zap, Map } from "lucide-react";
 import { useEffect } from "react";
 import Image from "next/image";
 import logo from "@public/Logo (1).png";
+import { DocumentationTab } from "@/components/DocumentationTab";
 export default function Home() {
   const {
     activeTab,
@@ -21,6 +22,7 @@ export default function Home() {
     { id: "mapper", label: "cURL Mapper", icon: Map },
     { id: "test", label: "Test Console", icon: Play },
     { id: "collections", label: "Collections", icon: FolderOpen },
+    { id: "Documentation", label: "Documentation", icon: FolderOpen },
   ] as const;
 
   useEffect(() => {
@@ -106,6 +108,7 @@ export default function Home() {
         {activeTab === "mapper" && <RequestResponseMapper />}
         {activeTab === "test" && <TestConsole />}
         {activeTab === "collections" && <CollectionsManager />}
+        {activeTab === "Documentation" && <DocumentationTab />}
       </main>
     </div>
   );
