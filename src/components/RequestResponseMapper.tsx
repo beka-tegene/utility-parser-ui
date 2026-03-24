@@ -305,6 +305,7 @@ export function RequestResponseMapper() {
   const [collectionName, setCollectionName] = useState("");
   const [parserCode, setParserCode] = useState("");
   const [description, setDescription] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
 
   // Manual HTTP method selection per step
   const [stepHttpMethods, setStepHttpMethods] = useState<
@@ -775,19 +776,26 @@ export function RequestResponseMapper() {
     const steps = multiStepData[templateCode]?.steps || [];
     const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
 
-    // Generate templates for all steps
+    // Generate templates for all steps by calling generateConfig for each step
     const generatedTemplates: Record<string, unknown>[] = [];
 
     // Iterate through all steps
-    steps.forEach((step, index) => {
-      const currentStepData = step;
-      const initialContextMappings =
-        currentStepData?.contextFieldMappings || {};
-      const initialOverrideConfigs =
-        currentStepData?.overrideFieldConfigs || {};
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const stepIndex = i;
+      const stepName = step.stepName || STEP_ORDER[i] || `STEP_${i + 1}`;
 
+      // Get step-specific data
+      const stepParsedRequest = step.parsedRequest;
+      const stepParsedResponse = step.parsedResponse;
+      const stepContextMappings = step.contextFieldMappings || {};
+      const stepOverrideConfigs = step.overrideFieldConfigs || {};
+
+      // Build response mapper
       const responseMapper: Record<string, string> = {};
-      const requestMapper: Record<string, string> = {};
+      const requestMapper: Record<string, any> = {};
+      const staticFields: Record<string, string> = {};
+      const credentials: Record<string, string> = {};
       const overriddenRequestBody: Array<{
         field: string;
         value: string;
@@ -799,85 +807,167 @@ export function RequestResponseMapper() {
         required: boolean;
       }> = [];
 
-      // Response mapper: fields stored in context
-      Object.entries(initialContextMappings).forEach(
-        ([originalKey, displayName]) => {
-          responseMapper[originalKey] = displayName;
-        },
-      );
-
-      // Override fields
-      Object.values(initialOverrideConfigs).forEach((config) => {
-        overriddenRequestBody.push({
-          field: config.field,
-          value: config.value,
-          actual_mapping: config.actual_mapping,
-          type: config.type,
-          required: config.required,
-          ...(config.max_length !== undefined && {
-            max_length: config.max_length,
-          }),
-          ...(config.min_length !== undefined && {
-            min_length: config.min_length,
-          }),
-          ...(config.pattern && { pattern: config.pattern }),
-        });
+      // Build response mapper from context field mappings
+      Object.entries(stepContextMappings).forEach(([path, displayName]) => {
+        const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
+        responseMapper[displayName] = formattedKey;
       });
 
+      // Separate collections for regular fields and array fields
+      const regularFields: Record<string, string> = {};
+      const additionalFields: Array<{ Key: string; Value: string }> = [];
+
+      // Build override fields from override configs
+      Object.values(stepOverrideConfigs).forEach((config) => {
+        if (stepName !== "PAYMENT") {
+          overriddenRequestBody.push({
+            field: config.field,
+            value: config.value,
+            actual_mapping: config.actual_mapping,
+            type: config.type,
+            required: config.required,
+            ...(config.max_length !== undefined && {
+              max_length: config.max_length,
+            }),
+            ...(config.min_length !== undefined && {
+              min_length: config.min_length,
+            }),
+            ...(config.pattern && { pattern: config.pattern }),
+          });
+        }
+
+        // Format the actual_mapping to use dots instead of brackets
+        const formattedPath = config.actual_mapping
+          .replace(/\[/g, ".")
+          .replace(/\]/g, "");
+
+        // Check if this override should go to Additional_Fields
+        const isArrayField =
+          config.field.toLowerCase().includes("limit") ||
+          config.field.toLowerCase().includes("additional") ||
+          config.field.toLowerCase().includes("field");
+
+        if (isArrayField) {
+          // Add to Additional_Fields array
+          additionalFields.push({
+            Key: config.field,
+            Value: `{{${formattedPath}}}`,
+          });
+        } else {
+          // Add as regular field
+          regularFields[config.field] = `{{${config.value}}}`;
+        }
+      });
+
+      // ============ PAYMENT STEP SPECIFIC AUTO-CONFIGURATION ============
+      if (stepName === "PAYMENT") {
+        // Always add Debit_Account_Number to regularFields
+        regularFields["Debit_Account_Number"] = "{{Debit_Account_Number}}";
+
+        // Always add Debit_Account_Number to overriddenRequestBody if not already present
+        const debitAccountExists = overriddenRequestBody.some(
+          (item) => item.field === "Debit_Account_Number",
+        );
+
+        if (!debitAccountExists) {
+          overriddenRequestBody.push({
+            field: "Debit_Account_Number",
+            value: "request.Debit_Account_Number",
+            actual_mapping: "Debit_Account_Number",
+            type: "string",
+            required: true,
+          });
+        }
+      }
+      // =================================================================
+
+      // Extract credentials from request body for TOKEN step
+      if (stepName === "TOKEN" && stepParsedRequest?.body) {
+        Object.entries(stepParsedRequest.body).forEach(([key, value]) => {
+          if (
+            typeof value === "string" &&
+            (key.includes("client_") ||
+              key.includes("secret") ||
+              key.includes("DEST_"))
+          ) {
+            credentials[key] = value;
+          }
+        });
+      }
+
       // Determine step progression
-      const currentStepName = step.stepName || "STEP";
-      const currentStepIdx = STEP_ORDER.indexOf(currentStepName);
+      const currentStepIdx = STEP_ORDER.indexOf(stepName);
       const nextStepName =
         currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
           ? STEP_ORDER[currentStepIdx + 1]
           : "DONE";
 
-      // Build template structure matching backend
+      // Build template structure matching the desired format
       const template: Record<string, unknown> = {
-        name: currentStepName,
-        current_step: currentStepName,
+        name: stepName || "STEP",
+        parser_code: `${parserCode}_${stepName?.toLowerCase()}_v10`,
+        current_step: stepName || "STEP",
         next_step: nextStepName,
-        url: parsedRequest?.url || "",
-        method: parsedRequest?.method || "POST",
-        header_type: parsedRequest?.headers || {},
-        request_mapper:
-          Object.keys(requestMapper).length > 0 ? requestMapper : undefined,
-        response_mapper:
-          Object.keys(responseMapper).length > 0 ? responseMapper : undefined,
+        description: `${stepName?.toLowerCase()} step`,
+        url: stepParsedRequest?.url || "",
+        method: stepParsedRequest?.method || "POST",
+        header_type: stepParsedRequest?.headers || {},
+        authorization_mapper: {},
+        credentials: credentials,
+        static_fields: staticFields,
+        body: stepParsedRequest?.body || {},
       };
 
-      // Add authorization_mapper if bearer token is detected
+      // Build the final request_mapper
+      const finalRequestMapper: Record<string, any> = { ...regularFields };
+
+      // Add Additional_Fields if there are any
+      if (additionalFields.length > 0) {
+        finalRequestMapper.Additional_Fields = additionalFields;
+      }
+
+      // Add request_mapper if not empty
+      if (Object.keys(finalRequestMapper).length > 0) {
+        template.request_mapper = finalRequestMapper;
+      }
+
+      // Add response_mapper if not empty
+      if (Object.keys(responseMapper).length > 0) {
+        template.response_mapper = responseMapper;
+      }
+
+      // Add authorization_mapper if bearer token detected
       const authHeader =
-        parsedRequest?.headers?.["Authorization"] ||
-        parsedRequest?.headers?.["authorization"];
+        stepParsedRequest?.headers?.["Authorization"] ||
+        stepParsedRequest?.headers?.["authorization"];
       if (authHeader?.toLowerCase().startsWith("bearer")) {
         template.authorization_mapper = {
-          type: "bearer",
-          token: "accumulated.access_token",
+          type: "Bearer",
+          token: "{{accumulated.access_token}}",
         };
       }
 
-      // Add to_be_overridden only if there are override fields
+      // Add to_be_overridden if not empty
       if (overriddenRequestBody.length > 0) {
         template.to_be_overridden = {
           overridden_request_body: overriddenRequestBody,
         };
       }
 
-      // Add body if exists
-      if (parsedRequest?.body) {
-        template.body = parsedRequest.body;
-      }
-
       // Remove undefined fields
       Object.keys(template).forEach((key) => {
-        if (template[key] === undefined) {
+        if (
+          template[key] === undefined ||
+          (typeof template[key] === "object" &&
+            template[key] !== null &&
+            Object.keys(template[key] as object).length === 0)
+        ) {
           delete template[key];
         }
       });
 
       generatedTemplates.push(template);
-    });
+    }
 
     // Create the final config
     const config = {
@@ -1213,6 +1303,242 @@ export function RequestResponseMapper() {
     setOverrideConfigs,
   ]);
 
+  const handleSubmitConfig = async () => {
+    const steps = multiStepData[templateCode]?.steps || [];
+    const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
+
+    // Generate templates for all steps by calling generateConfig for each step
+    const generatedTemplates: Record<string, unknown>[] = [];
+
+    // Iterate through all steps
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const stepIndex = i;
+      const stepName = step.stepName || STEP_ORDER[i] || `STEP_${i + 1}`;
+
+      // Get step-specific data
+      const stepParsedRequest = step.parsedRequest;
+      const stepParsedResponse = step.parsedResponse;
+      const stepContextMappings = step.contextFieldMappings || {};
+      const stepOverrideConfigs = step.overrideFieldConfigs || {};
+
+      // Build response mapper
+      const responseMapper: Record<string, string> = {};
+      const requestMapper: Record<string, any> = {};
+      const staticFields: Record<string, string> = {};
+      const credentials: Record<string, string> = {};
+      const overriddenRequestBody: Array<{
+        field: string;
+        value: string;
+        actual_mapping: string;
+        type: string;
+        max_length?: number;
+        min_length?: number;
+        pattern?: string;
+        required: boolean;
+      }> = [];
+
+      // Build response mapper from context field mappings
+      Object.entries(stepContextMappings).forEach(([path, displayName]) => {
+        const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
+        responseMapper[displayName] = formattedKey;
+      });
+
+      // Separate collections for regular fields and array fields
+      const regularFields: Record<string, string> = {};
+      const additionalFields: Array<{ Key: string; Value: string }> = [];
+
+      // Build override fields from override configs
+      Object.values(stepOverrideConfigs).forEach((config) => {
+        if (stepName !== "PAYMENT") {
+          overriddenRequestBody.push({
+            field: config.field,
+            value: config.value,
+            actual_mapping: config.actual_mapping,
+            type: config.type,
+            required: config.required,
+            ...(config.max_length !== undefined && {
+              max_length: config.max_length,
+            }),
+            ...(config.min_length !== undefined && {
+              min_length: config.min_length,
+            }),
+            ...(config.pattern && { pattern: config.pattern }),
+          });
+        }
+
+        // Format the actual_mapping to use dots instead of brackets
+        const formattedPath = config.actual_mapping
+          .replace(/\[/g, ".")
+          .replace(/\]/g, "");
+
+        // Check if this override should go to Additional_Fields
+        const isArrayField =
+          config.field.toLowerCase().includes("limit") ||
+          config.field.toLowerCase().includes("additional") ||
+          config.field.toLowerCase().includes("field");
+
+        if (isArrayField) {
+          // Add to Additional_Fields array
+          additionalFields.push({
+            Key: config.field,
+            Value: `{{${formattedPath}}}`,
+          });
+        } else {
+          // Add as regular field
+          regularFields[config.field] = `{{${config.value}}}`;
+        }
+      });
+
+      // ============ PAYMENT STEP SPECIFIC AUTO-CONFIGURATION ============
+      if (stepName === "PAYMENT") {
+        // Always add Debit_Account_Number to regularFields
+        regularFields["Debit_Account_Number"] = "{{Debit_Account_Number}}";
+
+        // Always add Debit_Account_Number to overriddenRequestBody if not already present
+        const debitAccountExists = overriddenRequestBody.some(
+          (item) => item.field === "Debit_Account_Number",
+        );
+
+        if (!debitAccountExists) {
+          overriddenRequestBody.push({
+            field: "Debit_Account_Number",
+            value: "request.Debit_Account_Number",
+            actual_mapping: "Debit_Account_Number",
+            type: "string",
+            required: true,
+          });
+        }
+      }
+      // =================================================================
+
+      // Extract credentials from request body for TOKEN step
+      if (stepName === "TOKEN" && stepParsedRequest?.body) {
+        Object.entries(stepParsedRequest.body).forEach(([key, value]) => {
+          if (
+            typeof value === "string" &&
+            (key.includes("client_") ||
+              key.includes("secret") ||
+              key.includes("DEST_"))
+          ) {
+            credentials[key] = value;
+          }
+        });
+      }
+
+      // Determine step progression
+      const currentStepIdx = STEP_ORDER.indexOf(stepName);
+      const nextStepName =
+        currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
+          ? STEP_ORDER[currentStepIdx + 1]
+          : "DONE";
+
+      // Build template structure matching the desired format
+      const template: Record<string, unknown> = {
+        name: stepName || "STEP",
+        parser_code: `${parserCode}_${stepName?.toLowerCase()}_v10`,
+        current_step: stepName || "STEP",
+        next_step: nextStepName,
+        description: `${stepName?.toLowerCase()} step`,
+        url: stepParsedRequest?.url || "",
+        method: stepParsedRequest?.method || "POST",
+        header_type: stepParsedRequest?.headers || {},
+        authorization_mapper: {},
+        credentials: credentials,
+        static_fields: staticFields,
+        body: stepParsedRequest?.body || {},
+      };
+
+      // Build the final request_mapper
+      const finalRequestMapper: Record<string, any> = { ...regularFields };
+
+      // Add Additional_Fields if there are any
+      if (additionalFields.length > 0) {
+        finalRequestMapper.Additional_Fields = additionalFields;
+      }
+
+      // Add request_mapper if not empty
+      if (Object.keys(finalRequestMapper).length > 0) {
+        template.request_mapper = finalRequestMapper;
+      }
+
+      // Add response_mapper if not empty
+      if (Object.keys(responseMapper).length > 0) {
+        template.response_mapper = responseMapper;
+      }
+
+      // Add authorization_mapper if bearer token detected
+      const authHeader =
+        stepParsedRequest?.headers?.["Authorization"] ||
+        stepParsedRequest?.headers?.["authorization"];
+      if (authHeader?.toLowerCase().startsWith("bearer")) {
+        template.authorization_mapper = {
+          type: "Bearer",
+          token: "{{accumulated.access_token}}",
+        };
+      }
+
+      // Add to_be_overridden if not empty
+      if (overriddenRequestBody.length > 0) {
+        template.to_be_overridden = {
+          overridden_request_body: overriddenRequestBody,
+        };
+      }
+
+      // Remove undefined fields
+      Object.keys(template).forEach((key) => {
+        if (
+          template[key] === undefined ||
+          (typeof template[key] === "object" &&
+            template[key] !== null &&
+            Object.keys(template[key] as object).length === 0)
+        ) {
+          delete template[key];
+        }
+      });
+
+      generatedTemplates.push(template);
+    }
+
+    // Create the final config
+    const config = {
+      name: collectionName,
+      template_code: parserCode,
+      description: description,
+      templates: generatedTemplates,
+      mappings: fieldMappings,
+      accumulated: workflowContext.accumulated,
+    };
+
+    try {
+      const response = await fetch(
+        `https://qaapisuperapp.cbe.com.et/api/v1/cbesuperapp/utility/collections`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie:
+              "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
+          },
+          body: JSON.stringify(config),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Success:", result);
+      alert("Configuration submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting config:", error);
+      alert(
+        `Failed to submit configuration: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-gray-100">
       {/* Header */}
@@ -1279,6 +1605,14 @@ export function RequestResponseMapper() {
             </button>
 
             <button
+              onClick={handleSubmitConfig}
+              disabled={workflowContext.steps.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-600 rounded-md text-xs font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              Submit
+            </button>
+
+            <button
               onClick={handleClear}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-xs font-medium hover:bg-red-100 transition-colors"
             >
@@ -1315,6 +1649,16 @@ export function RequestResponseMapper() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Description"
+              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
+          </label>
+          <label htmlFor="" className="-space-y-0.5">
+            <span className="text-sm">Logo URL</span>
+            <input
+              type="text"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              placeholder="https://example.com"
               className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
             />
           </label>
