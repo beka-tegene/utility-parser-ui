@@ -56,9 +56,9 @@ interface AppState {
   setApiBaseUrl: (url: string) => void;
 
   // UI state
-  activeTab: "mapper" | "test" | "collections" | "Documentation";
+  activeTab: "mapper" | "test" | "collections" | "Documentation" | "Error";
   setActiveTab: (
-    tab: "mapper" | "test" | "collections" | "Documentation",
+    tab: "mapper" | "test" | "collections" | "Documentation" | "Error",
   ) => void;
 
   // Collections list

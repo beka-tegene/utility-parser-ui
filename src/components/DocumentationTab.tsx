@@ -28,7 +28,7 @@ interface DocSection {
   content: React.ReactNode;
 }
 
-export function DocumentationTab() {
+function DocumentationTab() {
   const [copied, setCopied] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSection, setActiveSection] = useState("introduction");
@@ -678,3 +678,4 @@ Reason: {{accumulated.reason}}`}
     </div>
   );
 }
+export default DocumentationTab;

@@ -160,7 +160,7 @@ export function CollectionsManager() {
   const handleEditCollection = (collection: any) => {
     setCollection(collection);
     setCurrentTemplateIndex(0);
-    setActiveTab("mapper");
+    setActiveTab("test");
   };
 
   const handleViewGroupCollections = (group: any) => {

@@ -5,10 +5,11 @@ import { TestConsole } from "@/components/TestConsole";
 import { CollectionsManager } from "@/components/CollectionsManager";
 import { RequestResponseMapper } from "@/components/RequestResponseMapper";
 import { Play, FolderOpen, Settings, Zap, Map } from "lucide-react";
-import { useEffect } from "react";
+// import { useEffect } from "react";
 import Image from "next/image";
 import logo from "@public/Logo (1).png";
-import { DocumentationTab } from "@/components/DocumentationTab";
+import DocumentationTab from "@/components/DocumentationTab";
+import ErrorHandling from "@/components/ErrorHandling";
 export default function Home() {
   const {
     activeTab,
@@ -16,24 +17,26 @@ export default function Home() {
     collection,
     apiBaseUrl,
     setApiBaseUrl,
-    clearHistory,
+    // clearAllStorage,
   } = useAppStore();
+
   const tabs = [
     { id: "mapper", label: "cURL Mapper", icon: Map },
-    { id: "test", label: "Test Console", icon: Play },
     { id: "collections", label: "Collections", icon: FolderOpen },
+    { id: "test", label: "Test Console", icon: Play },
+    { id: "Error", label: "Error Handling", icon: FolderOpen },
     { id: "Documentation", label: "Documentation", icon: FolderOpen },
   ] as const;
 
-  useEffect(() => {
-    const navEntries = performance.getEntriesByType(
-      "navigation",
-    ) as PerformanceNavigationTiming[];
+  // useEffect(() => {
+  //   const navEntries = performance.getEntriesByType(
+  //     "navigation",
+  //   ) as PerformanceNavigationTiming[];
 
-    if (navEntries.length > 0 && navEntries[0].type === "reload") {
-      clearHistory();
-    }
-  }, []);
+  //   if (navEntries.length > 0 && navEntries[0].type === "reload") {
+  //     clearAllStorage();
+  //   }
+  // }, []);
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       <header className="bg-gradient-to-l to-[#A8222E] from-[#360000] h-32 rounded-b-xl ">
@@ -50,8 +53,8 @@ export default function Home() {
           <div className="flex items-center gap-4">
             {collection && (
               <div className="text-sm">
-                <span className="text-gray-500">Editing: </span>
-                <span className="font-medium text-gray-800">
+                <span className="text-gray-300">Editing: </span>
+                <span className="font-medium text-white">
                   {collection.name ||
                     collection.template_code ||
                     "New Collection"}
@@ -108,6 +111,7 @@ export default function Home() {
         {activeTab === "mapper" && <RequestResponseMapper />}
         {activeTab === "test" && <TestConsole />}
         {activeTab === "collections" && <CollectionsManager />}
+        {activeTab === "Error" && <ErrorHandling />}
         {activeTab === "Documentation" && <DocumentationTab />}
       </main>
     </div>

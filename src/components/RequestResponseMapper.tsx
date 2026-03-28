@@ -762,15 +762,16 @@ export function RequestResponseMapper() {
   };
 
   const handleClear = () => {
-    if (
-      confirm(
-        "Are you sure you want to clear all saved data? This cannot be undone.",
-      )
-    ) {
-      clearAllStorage();
-      window.location.reload();
-    }
+    // if (
+    //   confirm(
+    //     "Are you sure you want to clear all saved data? This cannot be undone.",
+    //   )
+    // ) {
+    // }
+    window.location.reload();
+    clearAllStorage();
   };
+
   const [templateAll, setTemplateAll] = useState<any[]>([]);
 
   // Export workflow configuration
@@ -1227,6 +1228,7 @@ export function RequestResponseMapper() {
   const [groupName, setGroupName] = useState("");
   const [groupCode, setGroupCode] = useState("");
   const [collectionCodes, setCollectionCodes] = useState("");
+  const [responseData, setResponseData] = useState<any>(null);
   const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
 
   const handleSubmitConfig = async () => {
@@ -1262,6 +1264,7 @@ export function RequestResponseMapper() {
       console.log("Collection created:", collectionResult);
 
       // Show modal to get group information
+      setResponseData(collectionResult);
       setShowGroupModal(true);
     } catch (error) {
       console.error("Error submitting config:", error);
@@ -1273,32 +1276,17 @@ export function RequestResponseMapper() {
 
   // Handle group submission
   const handleSubmitGroup = async () => {
-    if (!groupName.trim() || !groupCode.trim() || !collectionCodes.trim()) {
+    if (!groupName.trim() || !groupCode.trim()) {
       toast.error("Please fill in all fields");
       return;
     }
 
     setIsSubmittingGroup(true);
 
-    // Parse collection codes (comma-separated or array format)
-    let collectionCodesArray: string[] = [];
-    try {
-      // Try to parse as JSON array first
-      const parsed = JSON.parse(collectionCodes);
-      if (Array.isArray(parsed)) {
-        collectionCodesArray = parsed;
-      } else {
-        collectionCodesArray = [collectionCodes];
-      }
-    } catch {
-      // If not JSON, split by comma
-      collectionCodesArray = collectionCodes.split(",").map((c) => c.trim());
-    }
-
     const groupData = {
       group_name: groupName,
       group_code: groupCode,
-      collection_codes: collectionCodesArray,
+      collection_codes: [responseData.template_code],
     };
 
     try {
@@ -1329,7 +1317,7 @@ export function RequestResponseMapper() {
       setCollectionCodes("");
 
       // Reset the workflow
-      handleResetWorkflow();
+      // handleResetWorkflow();
     } catch (error) {
       console.error("Error creating group:", error);
       toast.error(
@@ -1998,48 +1986,56 @@ export function RequestResponseMapper() {
                       Display name for the collection group
                     </p>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Group Name <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={groupName}
+                      onChange={(e) => setGroupName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    >
+                      <option value={"Utilities & Post Paid"}>
+                        Utilities & Post Paid
+                      </option>
+                      <option value={"Government Service"}>
+                        Government Service
+                      </option>
+                      <option value={"Travel & Transport"}>
+                        Travel & Transport
+                      </option>
+                      <option value={"E-Commerce"}>E-Commerce</option>
+                      <option value={"Entertainment"}>Entertainment</option>
+                      <option value={"School Fee"}>School Fee</option>
+                      <option value={"Other Payment"}>Other Payment</option>
+                    </select>
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Group Code
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={groupCode}
                       onChange={(e) => setGroupCode(e.target.value)}
-                      placeholder="e.g., Travel_Transport_v0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Unique identifier for the group (no spaces)
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Collection Codes
-                    </label>
-                    <textarea
-                      value={collectionCodes}
-                      onChange={(e) => setCollectionCodes(e.target.value)}
-                      placeholder='["GUZOGO", "Ethiopian_Airlines_Ticket"] or GUZOGO, Ethiopian_Airlines_Ticket'
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Enter collection template codes as JSON array or
-                      comma-separated list
-                    </p>
-                  </div>
-
-                  <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
-                    <p className="font-medium mb-1">📌 Example:</p>
-                    <p className="font-mono text-xs">
-                      JSON: [GUZOGO, Ethiopian_Airlines_Ticket]
-                    </p>
-                    <p className="font-mono text-xs mt-1">
-                      Comma: GUZOGO, Ethiopian_Airlines_Ticket
-                    </p>
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    >
+                      <option value={"Utilities&Post_Paid"}>
+                        Utilities&Post_Paid
+                      </option>
+                      <option value={"Government_Service"}>
+                        Government_Service
+                      </option>
+                      <option value={"Travel_Transport_v0"}>
+                        Travel_Transport_v0
+                      </option>
+                      <option value={"E_Commerce"}>E_Commerce</option>
+                      <option value={"Entertainment"}>Entertainment</option>
+                      <option value={"School_Fee"}>School_Fee</option>
+                      <option value={"Other_Payment"}>Other_Payment</option>
+                    </select>
                   </div>
                 </div>
 

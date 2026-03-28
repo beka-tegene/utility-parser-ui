@@ -58,7 +58,7 @@ export function TestConsole() {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/api/v1/cbesuperapp/utility/proxy/initial`,
+        `${apiBaseUrl}/cbesuperapp/utility/proxy/initial`,
         {
           method: "POST",
           headers: {
@@ -146,7 +146,7 @@ export function TestConsole() {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/api/v1/cbesuperapp/utility/proxy/process`,
+        `${apiBaseUrl}/cbesuperapp/utility/proxy/process`,
         {
           method: "POST",
           headers: {
@@ -258,7 +258,7 @@ export function TestConsole() {
             type="text"
             value={apiBaseUrl}
             onChange={(e) => setApiBaseUrl(e.target.value)}
-            placeholder="https://qaapisuperapp.cbe.com.et/api/v1"
+            placeholder="https://qaapisuperapp.cbe.co"
             className="w-full px-3 py-2 text-sm border rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
