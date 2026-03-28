@@ -50,6 +50,7 @@ import {
   AlertCircle,
   Save,
 } from "lucide-react";
+import { toast } from "sonner";
 
 // Layout modes
 // type LayoutMode = "vertical" | "horizontal" | "focus";
@@ -1970,7 +1971,7 @@ function WorkflowMindMapInner({
       arrayNodesWithSelections.length === 0 &&
       regularSelectedNodes.length === 0
     ) {
-      alert(
+      toast.error(
         "Please either:\n1. Check boxes in array items, OR\n2. Select regular request fields",
       );
       return;
@@ -2040,9 +2041,7 @@ function WorkflowMindMapInner({
 
     // Get regular selected nodes (non-array response nodes)
     const regularSelectedNodes = nodes.filter(
-      (n) =>
-        selectedNodes.includes(n.id) &&
-        n.type !== "arrayObjectNode",
+      (n) => selectedNodes.includes(n.id) && n.type !== "arrayObjectNode",
     );
 
     // If nothing is selected, show alert
@@ -2050,7 +2049,7 @@ function WorkflowMindMapInner({
       arrayNodesWithSelections.length === 0 &&
       regularSelectedNodes.length === 0
     ) {
-      alert(
+      toast.error(
         "Please either:\n1. Check boxes in response array items, OR\n2. Select regular response fields",
       );
       return;

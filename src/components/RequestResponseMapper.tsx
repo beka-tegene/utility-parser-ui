@@ -47,6 +47,7 @@ import {
   Redo2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface StepData {
   step: string;
@@ -1264,7 +1265,7 @@ export function RequestResponseMapper() {
       setShowGroupModal(true);
     } catch (error) {
       console.error("Error submitting config:", error);
-      alert(
+      toast.error(
         `Failed to submit configuration: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
@@ -1273,7 +1274,7 @@ export function RequestResponseMapper() {
   // Handle group submission
   const handleSubmitGroup = async () => {
     if (!groupName.trim() || !groupCode.trim() || !collectionCodes.trim()) {
-      alert("Please fill in all fields");
+      toast.error("Please fill in all fields");
       return;
     }
 
@@ -1321,7 +1322,7 @@ export function RequestResponseMapper() {
       const result = await response.json();
       console.log("Group created:", result);
 
-      alert("Collection and Group created successfully!");
+      toast.success("Collection and Group created successfully!");
       setShowGroupModal(false);
       setGroupName("");
       setGroupCode("");
@@ -1331,7 +1332,7 @@ export function RequestResponseMapper() {
       handleResetWorkflow();
     } catch (error) {
       console.error("Error creating group:", error);
-      alert(
+      toast.error(
         `Failed to create group: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     } finally {
@@ -1910,7 +1911,7 @@ export function RequestResponseMapper() {
                         setJsonSaved(true);
                         setTimeout(() => setJsonSaved(false), 2000);
                       } catch (e) {
-                        alert("Invalid JSON format");
+                        toast.error("Invalid JSON format");
                       }
                     }}
                     className="flex items-center gap-1.5 px-2 py-1 text-xs text-green-600 hover:text-green-700 bg-green-50 rounded hover:bg-green-100"

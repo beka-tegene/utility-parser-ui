@@ -7,6 +7,7 @@ import { AutoMapper } from './AutoMapper';
 import { extractPaths, generateId } from '@/lib/utils';
 import { Plus, Trash2, Download, Upload } from 'lucide-react';
 import type { Template, Collection, SetupBody, PayableItem } from '@/types';
+import { toast } from 'sonner';
 
 export function TemplateBuilder() {
   const {
@@ -75,7 +76,7 @@ export function TemplateBuilder() {
         setCollection(json);
         setCurrentTemplateIndex(0);
       } catch {
-        alert('Invalid JSON file');
+        toast.error('Invalid JSON file');
       }
     };
     reader.readAsText(file);
