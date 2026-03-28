@@ -780,7 +780,7 @@ export function RequestResponseMapper() {
       template_code: parserCode,
       description: description,
       logo: logoUrl,
-      templates: templateAll,
+      template: templateAll,
     };
 
     // Download the config
@@ -1235,7 +1235,7 @@ export function RequestResponseMapper() {
       template_code: parserCode,
       description: description,
       logo: logoUrl,
-      templates: templateAll,
+      template: templateAll,
     };
 
     try {
