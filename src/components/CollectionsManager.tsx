@@ -5,8 +5,6 @@ import { useAppStore } from "@/lib/store";
 import {
   Search,
   Plus,
-  Trash2,
-  Edit,
   Download,
   RefreshCw,
   Loader2,
@@ -17,75 +15,81 @@ import {
   Tag,
   Smartphone,
   ChevronRight,
-  ChevronLeft,
   Calendar,
   ArrowUpDown,
   X,
   CheckCircle2,
   Building2,
   Plane,
-  Ticket,
-  Users2,
-  Briefcase,
   Landmark,
-  Car,
   Eye,
   ArrowLeft,
-  Clock,
-  MapPin,
   CreditCard,
-  Globe,
-  Mail,
-  Phone,
-  User,
-  DollarSign,
   Hash,
   FileText,
+  Zap,
+  ShoppingCart,
+  Tv,
+  GraduationCap,
 } from "lucide-react";
-import type { Collection } from "@/types";
 
 // Icon mapping based on collection name/description
+// Icon mapping based on category names
 const getCollectionIcon = (name: string) => {
   const lowerName = name.toLowerCase();
-  if (lowerName.includes("airline") || lowerName.includes("ethiopian")) {
+  
+  if (lowerName.includes("travel") || lowerName.includes("transport")) {
     return <Plane className="w-5 h-5" />;
   }
-  if (lowerName.includes("ticket")) {
-    return <Ticket className="w-5 h-5" />;
+  if (lowerName.includes("utilities") || lowerName.includes("post paid")) {
+    return <Zap className="w-5 h-5" />;
   }
-  if (lowerName.includes("staff")) {
-    return <Users2 className="w-5 h-5" />;
-  }
-  if (lowerName.includes("travel") || lowerName.includes("transport")) {
-    return <Briefcase className="w-5 h-5" />;
-  }
-  if (lowerName.includes("seregela")) {
+  if (lowerName.includes("government")) {
     return <Landmark className="w-5 h-5" />;
   }
-  if (lowerName.includes("guzo")) {
-    return <Car className="w-5 h-5" />;
+  if (lowerName.includes("e-commerce") || lowerName.includes("commerce")) {
+    return <ShoppingCart className="w-5 h-5" />;
   }
+  if (lowerName.includes("entertainment")) {
+    return <Tv className="w-5 h-5" />;
+  }
+  if (lowerName.includes("school") || lowerName.includes("fee")) {
+    return <GraduationCap className="w-5 h-5" />;
+  }
+  if (lowerName.includes("other") || lowerName.includes("payment")) {
+    return <CreditCard className="w-5 h-5" />;
+  }
+  
+  // Default icon
   return <Building2 className="w-5 h-5" />;
 };
 
-// Get gradient based on collection name
+// Get gradient based on category name
 const getCollectionGradient = (name: string) => {
   const lowerName = name.toLowerCase();
-  if (lowerName.includes("airline") || lowerName.includes("ethiopian")) {
+  
+  if (lowerName.includes("travel") || lowerName.includes("transport")) {
     return "from-sky-500 to-blue-600";
   }
-  if (lowerName.includes("passport")) {
-    return "from-emerald-500 to-teal-600";
-  }
-  if (lowerName.includes("ticket")) {
+  if (lowerName.includes("utilities") || lowerName.includes("post paid")) {
     return "from-amber-500 to-orange-600";
   }
-  if (lowerName.includes("travel") || lowerName.includes("transport")) {
+  if (lowerName.includes("government")) {
+    return "from-emerald-500 to-teal-600";
+  }
+  if (lowerName.includes("e-commerce") || lowerName.includes("commerce")) {
     return "from-purple-500 to-pink-600";
   }
-  if (lowerName.includes("seregela")) {
+  if (lowerName.includes("entertainment")) {
+    return "from-rose-500 to-red-600";
+  }
+  if (lowerName.includes("school") || lowerName.includes("fee")) {
     return "from-indigo-500 to-purple-600";
   }
+  if (lowerName.includes("other") || lowerName.includes("payment")) {
+    return "from-gray-500 to-gray-600";
+  }
+  
   return "from-blue-500 to-purple-600";
 };
 
