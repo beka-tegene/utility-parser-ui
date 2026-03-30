@@ -133,7 +133,6 @@ export function TestConsole() {
   };
 
   const handleProcessStep = async () => {
-
     if (!currentToken) return;
 
     setIsRunning(true);
@@ -152,7 +151,6 @@ export function TestConsole() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            token: currentToken,
           },
           body: JSON.stringify({
             token: currentToken,
@@ -229,9 +227,96 @@ export function TestConsole() {
     setIsRunning(false);
   };
 
-  const handleTokenizerStep = async ()=>{
-    
-  }
+  const handleTokenizerStep = async () => {
+    if (!currentToken) return;
+    setIsRunning(true);
+    setTestSteps((prev) =>
+      prev.map((s, i) =>
+        i === currentStepIndex ? { ...s, status: "running" } : s,
+      ),
+    );
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/proxy/tokenizer`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token: currentToken,
+            debit_account: inputValues,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setCurrentToken(data.next_token);
+        setTestSteps((prev) =>
+          prev.map((s, i) =>
+            i === currentStepIndex
+              ? {
+                  ...s,
+                  status: "success",
+                  request: inputValues,
+                  response: data,
+                  timestamp: new Date().toISOString(),
+                }
+              : s,
+          ),
+        );
+
+        if (data.has_next) {
+          setCurrentStepIndex((prev) => prev + 1);
+          // Extract required fields for next step
+          if (data.to_be_overridden?.overridden_request_body) {
+            const newInputs: Record<string, string> = {};
+            data.to_be_overridden.overridden_request_body.forEach(
+              (field: { field: string }) => {
+                newInputs[field.field] = "";
+              },
+            );
+            setInputValues(newInputs);
+          }
+        } else {
+          // Workflow complete
+          setCurrentStepIndex(-1);
+        }
+      } else {
+        setTestSteps((prev) =>
+          prev.map((s, i) =>
+            i === currentStepIndex
+              ? {
+                  ...s,
+                  status: "error",
+                  error: data.message || "Unknown error",
+                  request: inputValues,
+                  response: data,
+                  timestamp: new Date().toISOString(),
+                }
+              : s,
+          ),
+        );
+      }
+    } catch (error) {
+      setTestSteps((prev) =>
+        prev.map((s, i) =>
+          i === currentStepIndex
+            ? {
+                ...s,
+                status: "error",
+                error: error instanceof Error ? error.message : "Network error",
+                timestamp: new Date().toISOString(),
+              }
+            : s,
+        ),
+      );
+    }
+
+    setIsRunning(false);
+  };
   const handleReset = () => {
     setTestSteps([]);
     setCurrentToken(null);
@@ -385,7 +470,9 @@ export function TestConsole() {
                 onClick={
                   currentStepIndex === 0
                     ? handleStartWorkflow
-                    : handleProcessStep
+                    : currentStepIndex === 1
+                      ? handleProcessStep
+                      : handleTokenizerStep
                 }
                 disabled={isRunning}
                 className="mt-4 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -395,7 +482,11 @@ export function TestConsole() {
                 ) : (
                   <Send className="w-4 h-4" />
                 )}
-                {currentStepIndex === 0 ? "Start Workflow" : "Process Step"}
+                {currentStepIndex === 0
+                  ? "Start Workflow"
+                  : currentStepIndex === 1
+                    ? "Process Step"
+                    : "Tokenizer Step"}
               </button>
             </div>
 
