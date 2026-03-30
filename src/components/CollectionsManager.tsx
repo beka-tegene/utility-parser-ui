@@ -435,7 +435,7 @@ export function CollectionsManager() {
                       </button>
                       <div className="flex items-center gap-1 text-xs text-gray-400">
                         <Eye className="w-3.5 h-3.5" />
-                        <span>Click to edit</span>
+                        <span>Click to Test</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </div>
                     </div>

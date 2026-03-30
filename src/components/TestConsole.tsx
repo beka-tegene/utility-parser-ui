@@ -74,7 +74,7 @@ export function TestConsole() {
       const data = await response.json();
 
       if (data.success) {
-        setCurrentToken(data.token);
+        setCurrentToken(data.token || data.next_token);
         setCurrentStepIndex(1);
         setTestSteps((prev) =>
           prev.map((s, i) =>
@@ -133,6 +133,7 @@ export function TestConsole() {
   };
 
   const handleProcessStep = async () => {
+
     if (!currentToken) return;
 
     setIsRunning(true);
@@ -151,6 +152,7 @@ export function TestConsole() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            token: currentToken,
           },
           body: JSON.stringify({
             token: currentToken,
@@ -227,6 +229,9 @@ export function TestConsole() {
     setIsRunning(false);
   };
 
+  const handleTokenizerStep = async ()=>{
+    
+  }
   const handleReset = () => {
     setTestSteps([]);
     setCurrentToken(null);
@@ -258,7 +263,7 @@ export function TestConsole() {
             type="text"
             value={apiBaseUrl}
             onChange={(e) => setApiBaseUrl(e.target.value)}
-            placeholder="https://qaapisuperapp.cbe.co"
+            placeholder="https://qaapisuperapp.cbe.com.et/api/v1"
             className="w-full px-3 py-2 text-sm border rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

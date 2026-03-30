@@ -291,7 +291,7 @@ export function RequestResponseMapper() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState("");
   const [activeView, setActiveView] = useState<"split" | "mindmap" | "json">(
-    "split",
+    "mindmap",
   );
   const [workflowContext, setWorkflowContext] = useState<WorkflowContext>({
     accumulated: {},
@@ -666,6 +666,7 @@ export function RequestResponseMapper() {
   };
 
   // Handle manual request addition
+  // Replace the existing handleManualRequestAdd with this updated version
   const handleManualRequestAdd = useCallback(
     (requestData: {
       method: string;
@@ -673,12 +674,38 @@ export function RequestResponseMapper() {
       headers: Record<string, string>;
       body: Record<string, unknown> | null;
     }) => {
-      setManualRequests((prev) => ({
-        ...prev,
-        [activeStepIndex]: [...(prev[activeStepIndex] || []), requestData],
-      }));
+      // Check if this is a delete operation (body is smaller than original)
+      const currentBody = parsedRequest?.body;
+      const isDeleteOperation =
+        currentBody &&
+        requestData.body &&
+        Object.keys(requestData.body).length < Object.keys(currentBody).length;
+
+      if (isDeleteOperation) {
+        // For delete operations, replace the entire parsed request
+        setStepParsedRequests((prev) => ({
+          ...prev,
+          [activeStepIndex]: {
+            method: requestData.method,
+            url: requestData.url,
+            headers: requestData.headers,
+            body: requestData.body,
+          },
+        }));
+        // Clear manual requests for this step since we're replacing with the new data
+        setManualRequests((prev) => ({
+          ...prev,
+          [activeStepIndex]: [],
+        }));
+      } else {
+        // For add operations, keep the existing behavior (add to manual requests)
+        setManualRequests((prev) => ({
+          ...prev,
+          [activeStepIndex]: [...(prev[activeStepIndex] || []), requestData],
+        }));
+      }
     },
-    [activeStepIndex],
+    [activeStepIndex, parsedRequest],
   );
 
   // Handle manual response addition
@@ -690,6 +717,100 @@ export function RequestResponseMapper() {
       }));
     },
     [activeStepIndex],
+  );
+
+  // Add these handlers in RequestResponseMapper
+  const handleRequestDelete = useCallback(
+    (fieldPath: string) => {
+      if (!parsedRequest?.body) return;
+
+      // Create a deep copy of the request body
+      const updatedBody = JSON.parse(JSON.stringify(parsedRequest.body));
+
+      // Delete the field by path
+      const deleteByPath = (obj: any, path: string) => {
+        const parts = path.split(".");
+        if (parts.length === 0) return obj;
+
+        let current = obj;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (current[parts[i]] === undefined) return obj;
+          current = current[parts[i]];
+        }
+
+        const lastKey = parts[parts.length - 1];
+        if (current && typeof current === "object" && lastKey in current) {
+          delete current[lastKey];
+        }
+        return obj;
+      };
+
+      deleteByPath(updatedBody, fieldPath);
+
+      // Update the parsed request
+      setStepParsedRequests((prev) => ({
+        ...prev,
+        [activeStepIndex]: {
+          method: parsedRequest.method,
+          url: parsedRequest.url,
+          headers: parsedRequest.headers,
+          body: updatedBody,
+        },
+      }));
+
+      // Clear any manual requests for this step since we're replacing
+      setManualRequests((prev) => ({
+        ...prev,
+        [activeStepIndex]: [],
+      }));
+
+      toast.success(`Field "${fieldPath}" deleted from request body`);
+    },
+    [activeStepIndex, parsedRequest],
+  );
+
+  const handleResponseDelete = useCallback(
+    (fieldPath: string) => {
+      if (!response) return;
+
+      // Create a deep copy of the response body
+      const updatedBody = JSON.parse(JSON.stringify(response));
+
+      // Delete the field by path
+      const deleteByPath = (obj: any, path: string) => {
+        const parts = path.split(".");
+        if (parts.length === 0) return obj;
+
+        let current = obj;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (current[parts[i]] === undefined) return obj;
+          current = current[parts[i]];
+        }
+
+        const lastKey = parts[parts.length - 1];
+        if (current && typeof current === "object" && lastKey in current) {
+          delete current[lastKey];
+        }
+        return obj;
+      };
+
+      deleteByPath(updatedBody, fieldPath);
+
+      // Update the response
+      setStepResponses((prev) => ({
+        ...prev,
+        [activeStepIndex]: updatedBody,
+      }));
+
+      // Clear any manual responses for this step
+      setManualResponses((prev) => ({
+        ...prev,
+        [activeStepIndex]: [],
+      }));
+
+      toast.success(`Field "${fieldPath}" deleted from response body`);
+    },
+    [activeStepIndex, response],
   );
 
   // Set manual response
@@ -1860,6 +1981,8 @@ export function RequestResponseMapper() {
                 onManualResponseAdd={handleManualResponseAdd}
                 initialContextMappings={contextMappings} // Use step-specific
                 initialOverrideConfigs={overrideConfigs}
+                onRequestDelete={handleRequestDelete} // Add this
+                onResponseDelete={handleResponseDelete}
               />
             </div>
           )}
