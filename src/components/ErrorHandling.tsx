@@ -77,7 +77,7 @@ export default function ErrorHandling() {
   // Fetch template codes for dropdown
   const fetchTemplateCodes = async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/cbesuperapp/utility/collections`);
+      const response = await fetch(`${apiBaseUrl}/cbesuperapp/utility/collections/noEnc`);
       if (!response.ok) throw new Error("Failed to fetch templates");
       const data = await response.json();
       setTemplateCodes(data.map((t: any) => t.template_code));
@@ -566,19 +566,19 @@ export default function ErrorHandling() {
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 max-w-80">
                           <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
                           <code className="text-sm font-mono text-gray-700 break-all">
                             {mapping.vendor_error_message}
                           </code>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 max-w-60">
                         <div className="text-sm text-gray-700">
                           {mapping.display_message}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center max-w-40">
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusCodeColor(mapping.http_status_code)}`}
                         >
@@ -647,50 +647,6 @@ export default function ErrorHandling() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* API Documentation Card */}
-      <div className="mx-6 mb-6">
-        <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl border p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <FileJson className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-800">API Reference</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-mono">
-                  POST
-                </span>
-                <code className="text-sm font-mono text-gray-600">
-                  /error-mappings
-                </code>
-              </div>
-              <pre className="text-xs font-mono text-gray-600 bg-white p-2 rounded border overflow-x-auto">
-                {`{
-  "vendor_error_message": "string",
-  "display_message": "string",
-  "http_status_code": 400,
-  "template_code": "string",
-  "is_active": true
-}`}
-              </pre>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-mono">
-                  GET
-                </span>
-                <code className="text-sm font-mono text-gray-600">
-                  /error-mappings
-                </code>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Returns list of all error mappings
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

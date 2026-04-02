@@ -53,7 +53,7 @@ export default function Home() {
           <div className="flex items-center gap-4">
             {collection && (
               <div className="text-sm">
-                <span className="text-gray-300">Editing: </span>
+                <span className="text-gray-300">Testing: </span>
                 <span className="font-medium text-white">
                   {collection.name ||
                     collection.template_code ||

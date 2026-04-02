@@ -31,13 +31,15 @@ import {
   ShoppingCart,
   Tv,
   GraduationCap,
+  Trash,
 } from "lucide-react";
+import { toast } from "sonner";
 
-// Icon mapping based on collection name/description
+// Icon mapping based on collection name
 // Icon mapping based on category names
 const getCollectionIcon = (name: string) => {
   const lowerName = name.toLowerCase();
-  
+
   if (lowerName.includes("travel") || lowerName.includes("transport")) {
     return <Plane className="w-5 h-5" />;
   }
@@ -59,7 +61,7 @@ const getCollectionIcon = (name: string) => {
   if (lowerName.includes("other") || lowerName.includes("payment")) {
     return <CreditCard className="w-5 h-5" />;
   }
-  
+
   // Default icon
   return <Building2 className="w-5 h-5" />;
 };
@@ -67,7 +69,7 @@ const getCollectionIcon = (name: string) => {
 // Get gradient based on category name
 const getCollectionGradient = (name: string) => {
   const lowerName = name.toLowerCase();
-  
+
   if (lowerName.includes("travel") || lowerName.includes("transport")) {
     return "from-sky-500 to-blue-600";
   }
@@ -89,7 +91,7 @@ const getCollectionGradient = (name: string) => {
   if (lowerName.includes("other") || lowerName.includes("payment")) {
     return "from-gray-500 to-gray-600";
   }
-  
+
   return "from-blue-500 to-purple-600";
 };
 
@@ -188,6 +190,31 @@ export function CollectionsManager() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDelete = async (collection: any) => {
+    if (!confirm("Are you sure you want to delete this collection?")) return;
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/collections/delete/${collection.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie:
+              "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
+          },
+        },
+      );
+      if (!response.ok) throw new Error("Failed to delete");
+
+      toast.success("Collection deleted Successfully");
+      fetchCollections();
+    } catch (error) {
+      toast.error("Failed to delete collection");
+      console.error(error);
+    }
+  };
+
   const handleCreateNew = () => {
     setCollection(null);
     setCurrentTemplateIndex(0);
@@ -202,8 +229,7 @@ export function CollectionsManager() {
     .filter((c) => {
       const matchesSearch =
         c.group_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.group_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        c.group_name?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesGroup = selectedGroup
         ? c.group_name === selectedGroup
@@ -239,7 +265,7 @@ export function CollectionsManager() {
   // Render Collections View (inside a group)
   if (showCollectionsView && selectedGroupData) {
     const collectionsList = selectedGroupData.collections || [];
-    
+
     return (
       <div className="h-full flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
         {/* Back Header */}
@@ -255,9 +281,15 @@ export function CollectionsManager() {
               </button>
               <div className="h-6 w-px bg-gray-200" />
               <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${getCollectionGradient(selectedGroupData.group_name || "")} flex items-center justify-center text-white shadow-lg`}>
+                <div
+                  className={`w-12 h-12 rounded-xl bg-gradient-to-r ${getCollectionGradient(selectedGroupData.group_name || "")} flex items-center justify-center text-white shadow-lg`}
+                >
                   {selectedGroupData.logo ? (
-                    <img src={selectedGroupData.logo} alt="" className="w-8 h-8 rounded object-cover" />
+                    <img
+                      src={selectedGroupData.logo}
+                      alt=""
+                      className="w-8 h-8 rounded object-cover"
+                    />
                   ) : (
                     getCollectionIcon(selectedGroupData.group_name || "")
                   )}
@@ -267,7 +299,9 @@ export function CollectionsManager() {
                     {selectedGroupData.group_name || "Unnamed Group"}
                   </h1>
                   <div className="flex items-center gap-3 text-sm text-gray-500">
-                    <span className="font-mono">{selectedGroupData.group_code}</span>
+                    <span className="font-mono">
+                      {selectedGroupData.group_code}
+                    </span>
                     <span>•</span>
                     <span>{collectionsList.length} Collections</span>
                     {selectedGroupData.created_at && (
@@ -275,7 +309,12 @@ export function CollectionsManager() {
                         <span>•</span>
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5" />
-                          <span>Created {new Date(selectedGroupData.created_at).toLocaleDateString()}</span>
+                          <span>
+                            Created{" "}
+                            {new Date(
+                              selectedGroupData.created_at,
+                            ).toLocaleDateString()}
+                          </span>
                         </div>
                       </>
                     )}
@@ -301,7 +340,9 @@ export function CollectionsManager() {
                 <FolderOpen className="w-10 h-10 text-gray-400" />
               </div>
               <p className="text-gray-600 mb-2">No collections in this group</p>
-              <p className="text-sm text-gray-400">This group doesnt have any collections yet</p>
+              <p className="text-sm text-gray-400">
+                This group doesnt have any collections yet
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -310,7 +351,7 @@ export function CollectionsManager() {
                 const firstTemplate = collection.template?.[0];
                 const stepCount = collection.template?.length || 0;
                 const steps = collection.template || [];
-                
+
                 return (
                   <div
                     key={collection.id || collection.template_code || index}
@@ -334,7 +375,9 @@ export function CollectionsManager() {
                           )}
                           <div className="flex-1">
                             <h3 className="font-bold text-gray-800 text-lg leading-tight">
-                              {collection.name || collection.template_code || "Unnamed"}
+                              {collection.name ||
+                                collection.template_code ||
+                                "Unnamed"}
                             </h3>
                             <p className="text-xs text-gray-500 font-mono mt-0.5">
                               {collection.template_code}
@@ -344,7 +387,9 @@ export function CollectionsManager() {
                         {collection.ussd_enabled && (
                           <div className="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-full">
                             <Smartphone className="w-3 h-3 text-green-600" />
-                            <span className="text-xs text-green-600 font-medium">USSD</span>
+                            <span className="text-xs text-green-600 font-medium">
+                              USSD
+                            </span>
                           </div>
                         )}
                       </div>
@@ -352,19 +397,15 @@ export function CollectionsManager() {
 
                     {/* Collection Content */}
                     <div className="p-5">
-                      {collection.description && (
-                        <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
-                          {collection.description}
-                        </p>
-                      )}
-
                       {/* Steps Overview */}
                       <div className="mb-4">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
                             <Hash className="w-3.5 h-3.5 text-blue-600" />
                           </div>
-                          <span className="text-xs font-medium text-gray-700">Workflow Steps</span>
+                          <span className="text-xs font-medium text-gray-700">
+                            Workflow Steps
+                          </span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {steps.map((step: any, idx: number) => (
@@ -372,7 +413,9 @@ export function CollectionsManager() {
                               key={idx}
                               className={`px-2.5 py-1 text-xs font-medium rounded-full ${getStepBadgeColor(step.current_step || step.name)}`}
                             >
-                              {step.current_step || step.name || `Step ${idx + 1}`}
+                              {step.current_step ||
+                                step.name ||
+                                `Step ${idx + 1}`}
                             </span>
                           ))}
                           <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
@@ -390,11 +433,20 @@ export function CollectionsManager() {
                           <div>
                             <div className="text-xs text-gray-500">Mappers</div>
                             <div className="text-sm font-semibold text-gray-800">
-                              {steps.reduce((count:any, step:any) => {
-                                if (step.request_mapper && Object.keys(step.request_mapper).length > 0) count++;
-                                if (step.response_mapper && Object.keys(step.response_mapper).length > 0) count++;
+                              {steps.reduce((count: any, step: any) => {
+                                if (
+                                  step.request_mapper &&
+                                  Object.keys(step.request_mapper).length > 0
+                                )
+                                  count++;
+                                if (
+                                  step.response_mapper &&
+                                  Object.keys(step.response_mapper).length > 0
+                                )
+                                  count++;
                                 return count;
-                              }, 0)} total
+                              }, 0)}{" "}
+                              total
                             </div>
                           </div>
                         </div>
@@ -403,11 +455,18 @@ export function CollectionsManager() {
                             <Tag className="w-3.5 h-3.5 text-purple-600" />
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500">Overrides</div>
+                            <div className="text-xs text-gray-500">
+                              Overrides
+                            </div>
                             <div className="text-sm font-semibold text-gray-800">
-                              {steps.reduce((count:any, step:any) => {
-                                return count + (step.to_be_overridden?.overridden_request_body?.length || 0);
-                              }, 0)} fields
+                              {steps.reduce((count: any, step: any) => {
+                                return (
+                                  count +
+                                  (step.to_be_overridden
+                                    ?.overridden_request_body?.length || 0)
+                                );
+                              }, 0)}{" "}
+                              fields
                             </div>
                           </div>
                         </div>
@@ -416,7 +475,12 @@ export function CollectionsManager() {
                       {collection.created_at && (
                         <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-4 pt-3 border-t">
                           <Calendar className="w-3 h-3" />
-                          <span>Created {new Date(collection.created_at).toLocaleDateString()}</span>
+                          <span>
+                            Created{" "}
+                            {new Date(
+                              collection.created_at,
+                            ).toLocaleDateString()}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -432,6 +496,16 @@ export function CollectionsManager() {
                       >
                         <Download className="w-3.5 h-3.5" />
                         Export
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(collection);
+                        }}
+                        className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
+                      >
+                        <Trash className="w-3.5 h-3.5" />
+                        Delete
                       </button>
                       <div className="flex items-center gap-1 text-xs text-gray-400">
                         <Eye className="w-3.5 h-3.5" />
@@ -462,7 +536,9 @@ export function CollectionsManager() {
                   <FolderOpen className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-gray-800">{stats.total}</div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {stats.total}
+                  </div>
                   <div className="text-xs text-gray-500">Service Groups</div>
                 </div>
               </div>
@@ -472,7 +548,9 @@ export function CollectionsManager() {
                   <Tag className="w-5 h-5 text-purple-600" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-gray-800">{stats.totalCollections}</div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {stats.totalCollections}
+                  </div>
                   <div className="text-xs text-gray-500">Total Collections</div>
                 </div>
               </div>
@@ -484,7 +562,9 @@ export function CollectionsManager() {
                       <Smartphone className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-gray-800">{stats.ussdEnabled}</div>
+                      <div className="text-2xl font-bold text-gray-800">
+                        {stats.ussdEnabled}
+                      </div>
                       <div className="text-xs text-gray-500">USSD Enabled</div>
                     </div>
                   </div>
@@ -512,7 +592,7 @@ export function CollectionsManager() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by group name, code, or description..."
+                placeholder="Search by group name or code..."
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 text-sm"
               />
               {searchQuery && (
@@ -609,7 +689,9 @@ export function CollectionsManager() {
             disabled={isLoading}
             className="flex items-center gap-1.5 px-3 py-2.5 text-sm text-gray-600 hover:text-gray-800 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors border border-gray-200"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+            />
             Refresh
           </button>
         </div>
@@ -702,12 +784,6 @@ export function CollectionsManager() {
 
                 {/* Card Content */}
                 <div className="p-5">
-                  {group.description && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {group.description}
-                    </p>
-                  )}
-
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -723,7 +799,9 @@ export function CollectionsManager() {
                     {group.ussd_enabled && (
                       <div className="flex items-center gap-1 px-2.5 py-1.5 bg-green-50 rounded-full">
                         <Smartphone className="w-3.5 h-3.5 text-green-600" />
-                        <span className="text-xs text-green-600 font-medium">USSD</span>
+                        <span className="text-xs text-green-600 font-medium">
+                          USSD
+                        </span>
                       </div>
                     )}
                   </div>
@@ -731,7 +809,10 @@ export function CollectionsManager() {
                   {group.created_at && (
                     <div className="flex items-center gap-1.5 text-xs text-gray-400 border-t pt-4">
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>Created {new Date(group.created_at).toLocaleDateString()}</span>
+                      <span>
+                        Created{" "}
+                        {new Date(group.created_at).toLocaleDateString()}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -750,7 +831,9 @@ export function CollectionsManager() {
                   </button>
                   <div className="flex items-center gap-1 text-xs text-gray-400">
                     <Eye className="w-3.5 h-3.5" />
-                    <span>View {group.collections?.length || 0} collections</span>
+                    <span>
+                      View {group.collections?.length || 0} collections
+                    </span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </div>
                 </div>
@@ -763,13 +846,21 @@ export function CollectionsManager() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Group</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Code</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
-                    <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Collections</th>
-                    <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">USSD</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
-                    <th className="text-right px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Group
+                    </th>
+                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Code
+                    </th>
+                    <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Collections
+                    </th>
+                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Created
+                    </th>
+                    <th className="text-right px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -806,22 +897,10 @@ export function CollectionsManager() {
                           {group.group_code}
                         </code>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-500 truncate max-w-xs">
-                          {group.description || "—"}
-                        </p>
-                      </td>
                       <td className="px-6 py-4 text-center">
                         <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-600 font-semibold text-sm">
                           {group.collections?.length || 0}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {group.ussd_enabled ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 text-xs text-gray-500">

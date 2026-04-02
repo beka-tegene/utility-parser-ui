@@ -590,6 +590,12 @@ export function createEmptyCollection(): Collection {
       createSetupTemplate(),
       createPaymentTemplate(),
     ],
+    template: [
+      createTokenTemplate(),
+      createQueryTemplate(),
+      createSetupTemplate(),
+      createPaymentTemplate(),
+    ],
     sequence: 4,
     logo: "",
     credit_account: "",

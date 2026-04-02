@@ -26,6 +26,7 @@ interface TestStep {
 export function TestConsole() {
   const { collection, apiBaseUrl, setApiBaseUrl } = useAppStore();
   const [testSteps, setTestSteps] = useState<TestStep[]>([]);
+  const [tokenBearer, setTokenBearer] = useState<string>("");
   const [currentToken, setCurrentToken] = useState<string | null>(null);
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [isRunning, setIsRunning] = useState(false);
@@ -34,11 +35,13 @@ export function TestConsole() {
   const initializeTest = () => {
     if (!collection) return;
 
-    const steps = collection.templates.map((template, index) => ({
-      step: index + 1,
-      name: template.current_step || `Step ${index + 1}`,
-      status: "pending" as const,
-    }));
+    const steps = collection.template
+      .filter((step) => step.name !== "SETUP")
+      .map((template, index) => ({
+        step: index + 1,
+        name: template.current_step || `Step ${index + 1}`,
+        status: "pending" as const,
+      }));
 
     setTestSteps(steps);
     setCurrentToken(null);
@@ -58,7 +61,7 @@ export function TestConsole() {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/cbesuperapp/utility/proxy/initial`,
+        `${apiBaseUrl}/cbesuperapp/utility/proxy/initial/noEnc`,
         {
           method: "POST",
           headers: {
@@ -146,11 +149,13 @@ export function TestConsole() {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/cbesuperapp/utility/proxy/process`,
+        `${apiBaseUrl}/cbesuperapp/utility/proxy/process/noEnc`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${tokenBearer}`,
+            
           },
           body: JSON.stringify({
             token: currentToken,
@@ -237,15 +242,17 @@ export function TestConsole() {
     );
     try {
       const response = await fetch(
-        `${apiBaseUrl}/cbesuperapp/utility/proxy/tokenizer`,
+        `${apiBaseUrl}/cbesuperapp/utility/proxy/tokenizer/noEnc`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${tokenBearer}`,
+            // "x-source":"false"
           },
           body: JSON.stringify({
             token: currentToken,
-            debit_account: inputValues,
+            debit_account: inputValues.Debit_Account_Number,
           }),
         },
       );
@@ -349,6 +356,18 @@ export function TestConsole() {
             value={apiBaseUrl}
             onChange={(e) => setApiBaseUrl(e.target.value)}
             placeholder="https://qaapisuperapp.cbe.com.et/api/v1"
+            className="w-full px-3 py-2 text-sm border rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Authorization
+          </label>
+          <input
+            type="text"
+            value={tokenBearer}
+            onChange={(e) => setTokenBearer(e.target.value)}
+            placeholder="e............"
             className="w-full px-3 py-2 text-sm border rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -498,6 +517,7 @@ export function TestConsole() {
 
               <div className="space-y-4">
                 {testSteps
+                  .filter((step) => step.name !== "SETUP")
                   .filter((s) => s.response)
                   .map((step, index) => (
                     <div key={index} className="bg-white rounded-lg border p-4">

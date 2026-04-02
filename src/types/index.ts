@@ -71,6 +71,7 @@ export interface Collection {
   name: string; // Display name
   description?: string;
   templates: Template[]; // Workflow steps (TOKEN → QUERY → SETUP → PAYMENT)
+  template: Template[]; // Workflow steps (TOKEN → QUERY → SETUP → PAYMENT)
   sequence?: number;
   created_at?: string;
   updated_at?: string;
