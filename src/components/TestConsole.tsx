@@ -12,6 +12,7 @@ import {
   Send,
   Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface TestStep {
   step: number;
@@ -155,7 +156,6 @@ export function TestConsole() {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${tokenBearer}`,
-            
           },
           body: JSON.stringify({
             token: currentToken,
@@ -248,9 +248,9 @@ export function TestConsole() {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${tokenBearer}`,
-            // "x-source":"false"
           },
           body: JSON.stringify({
+            app_type: "APP",
             token: currentToken,
             debit_account: inputValues.Debit_Account_Number,
           }),
@@ -288,8 +288,35 @@ export function TestConsole() {
             setInputValues(newInputs);
           }
         } else {
-          // Workflow complete
-          setCurrentStepIndex(-1);
+          // setCurrentStepIndex(-1);
+          try {
+            const res = await fetch(
+              `${apiBaseUrl}/cbesuperapp/utility/proxy/process/noEnc`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${tokenBearer}`,
+                },
+                body: JSON.stringify({
+                  token: data.next_token,
+                  payment_token: data.payment_token,
+                  request: {
+                    Debit_Account_Number: inputValues.Debit_Account_Number,
+                    category_id: data?.data?.id,
+                  },
+                }),
+              },
+            );
+            const processData = await res.json();
+            if (processData.success) {
+              toast.success("successfully Tested!");
+            } else {
+              toast.error("Test Failed!");
+            }
+          } catch (error) {
+            console.log(error);
+          }
         }
       } else {
         setTestSteps((prev) =>
