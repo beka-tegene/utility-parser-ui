@@ -260,6 +260,8 @@ export function TestConsole() {
       const data = await response.json();
 
       if (data.success) {
+        console.log("hello");
+        
         setCurrentToken(data.next_token);
         setTestSteps((prev) =>
           prev.map((s, i) =>
