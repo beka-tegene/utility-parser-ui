@@ -301,11 +301,10 @@ export function TestConsole() {
                   Authorization: `Bearer ${tokenBearer}`,
                 },
                 body: JSON.stringify({
-                  token: data.next_token,
-                  payment_token: data.payment_token,
+                  token: currentToken,
+                  payment_token:  data?.data?.id,
                   request: {
                     Debit_Account_Number: inputValues.Debit_Account_Number,
-                    category_id: data?.data?.id,
                   },
                 }),
               },
