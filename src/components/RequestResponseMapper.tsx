@@ -1030,7 +1030,8 @@ export function RequestResponseMapper() {
         typeof actualValue !== "object"
       ) {
         // This is a static value, use it directly without {{}}
-        responseMapper[displayName] = String(actualValue);
+        responseMapper[displayName] = displayName;
+        // responseMapper[displayName] = String(actualValue);
       } else {
         // This is a reference path, wrap in {{}}
         responseMapper[displayName] = `{{${formattedKey}}}`;
