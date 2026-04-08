@@ -62,10 +62,12 @@ export default function ErrorHandling() {
   const fetchErrorMappings = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${apiBaseUrl}/cbesuperapp/utility/error-mappings`);
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/error-mappings`,
+      );
       if (!response.ok) throw new Error("Failed to fetch error mappings");
       const data = await response.json();
-      setErrorMappings(data);
+      setErrorMappings(data === null ? [] : data);
     } catch (error) {
       toast.error("Failed to load error mappings");
       console.error(error);
@@ -77,10 +79,14 @@ export default function ErrorHandling() {
   // Fetch template codes for dropdown
   const fetchTemplateCodes = async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/cbesuperapp/utility/collections/noEnc`);
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/collections/noEnc`,
+      );
       if (!response.ok) throw new Error("Failed to fetch templates");
       const data = await response.json();
-      setTemplateCodes(data.map((t: any) => t.template_code));
+      setTemplateCodes(
+        data === null ? [] : data.map((t: any) => t.template_code),
+      );
     } catch (error) {
       console.error("Failed to fetch template codes", error);
     }
@@ -145,9 +151,12 @@ export default function ErrorHandling() {
     if (!confirm("Are you sure you want to delete this error mapping?")) return;
 
     try {
-      const response = await fetch(`${apiBaseUrl}/cbesuperapp/utility/error-mappings/${id}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/error-mappings/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (!response.ok) throw new Error("Failed to delete");
 
       toast.success("Error mapping deleted");
@@ -187,11 +196,14 @@ export default function ErrorHandling() {
   // Toggle active status
   const toggleActive = async (mapping: ErrorMapping) => {
     try {
-      const response = await fetch(`${apiBaseUrl}/cbesuperapp/utility/error-mappings/${mapping.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...mapping, is_active: !mapping.is_active }),
-      });
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/error-mappings/${mapping.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...mapping, is_active: !mapping.is_active }),
+        },
+      );
       if (!response.ok) throw new Error("Failed to update status");
 
       toast.success(
