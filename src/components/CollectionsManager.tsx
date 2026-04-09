@@ -141,7 +141,7 @@ export function CollectionsManager() {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/cbesuperapp/utility/collections/group`,
+        `${apiBaseUrl}/cbesuperapp/utility/collections/group/noEnc`,
       );
 
       if (!response.ok) {

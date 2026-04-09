@@ -1413,7 +1413,7 @@ export function RequestResponseMapper() {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/cbesuperapp/utility/collections/group/noEnc`,
+        `${apiBaseUrl}/cbesuperapp/utility/collections/group`,
         {
           method: "POST",
           headers: {
