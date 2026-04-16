@@ -245,6 +245,7 @@ export interface OverrideFieldConfig {
 export interface StepCurlData {
   stepIndex: number;
   stepName: string;
+  nextStep: string;
   curlInput: string;
   parsedRequest: ParsedCurl | null;
   responseInput: string;

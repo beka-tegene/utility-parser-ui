@@ -303,6 +303,7 @@ export function RequestResponseMapper() {
   const [showHistory, setShowHistory] = useState(true);
   const [copied, setCopied] = useState(false);
   const [currentStepName, setCurrentStepName] = useState("");
+  const [nextStepName, setNextStepName] = useState("");
   const [showResponseInput, setShowResponseInput] = useState(false);
   const [collectionName, setCollectionName] = useState("");
   const [parserCode, setParserCode] = useState("");
@@ -353,7 +354,46 @@ export function RequestResponseMapper() {
   useEffect(() => {
     setCurrentStepName(currentStep?.name || "");
   }, [activeStepIndex, currentStep?.name]);
+  useEffect(() => {
+    // Set default next step based on current step index
+    if (activeStepIndex === 3) {
+      setNextStepName("DONE");
+    } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
+      setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
+    } else {
+      setNextStepName("DONE");
+    }
+  }, [activeStepIndex]);
 
+  // Add handler for next step change
+  const handleNextStepChange = useCallback(
+    (newNextStep: string) => {
+      if (newNextStep === currentStepName) {
+        toast.error("Next step cannot be the same as current step");
+        return;
+      }
+      setNextStepName(newNextStep);
+
+      // Save to store
+      if (templateCode) {
+        updateStepCurlData(templateCode, activeStepIndex, {
+          nextStep: newNextStep,
+          contextFieldMappings: contextMappings,
+          overrideFieldConfigs: overrideConfigs,
+          nodes: stepNodes[activeStepIndex] || [],
+          edges: stepEdges[activeStepIndex] || [],
+        });
+      }
+    },
+    [
+      currentStepName,
+      templateCode,
+      activeStepIndex,
+      stepNodes,
+      stepEdges,
+      updateStepCurlData,
+    ],
+  );
   // Load step data when step changes
   useEffect(() => {
     const stepData = multiStepData[templateCode]?.steps?.[activeStepIndex];
@@ -467,6 +507,7 @@ export function RequestResponseMapper() {
           overrideFieldConfigs: state.overrideFieldConfigs,
           nodes: stepNodes[activeStepIndex] || [],
           edges: stepEdges[activeStepIndex] || [],
+          nextStep: nextStepName,
         });
       }
     },
@@ -873,6 +914,7 @@ export function RequestResponseMapper() {
     setCurlInput("");
     setResponseInput("");
     setCurrentStepName("");
+    setNextStepName("");
     setShowResponseInput(false);
     setManualRequests({});
     setManualResponses({});
@@ -1135,17 +1177,30 @@ export function RequestResponseMapper() {
     // Determine step progression
     const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
     const currentStepIdx = STEP_ORDER.indexOf(currentStepName);
-    const nextStepName =
-      currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
-        ? STEP_ORDER[currentStepIdx + 1]
-        : "DONE";
+    let finalNextStep = nextStepName;
+
+    // If nextStepName is empty or invalid, calculate default
+    if (!finalNextStep || finalNextStep === "") {
+      finalNextStep =
+        currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
+          ? STEP_ORDER[currentStepIdx + 1]
+          : "DONE";
+    }
+
+    // If the selected next step is the same as current, use default
+    if (finalNextStep === currentStepName) {
+      finalNextStep =
+        currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
+          ? STEP_ORDER[currentStepIdx + 1]
+          : "DONE";
+    }
 
     // Build template structure matching the desired format
     const template: Record<string, unknown> = {
       name: currentStepName || "STEP",
       parser_code: `${parserCode}_${currentStepName?.toLowerCase()}_v10`,
       current_step: currentStepName || "STEP",
-      next_step: nextStepName,
+      next_step: finalNextStep,
       description: `${currentStepName?.toLowerCase()} step`,
       url: parsedRequest?.url || "",
       method: parsedRequest?.method || "POST",
@@ -1304,7 +1359,7 @@ export function RequestResponseMapper() {
     }
   };
 
-  // Load step data when step changes
+  // Update the useEffect that loads step data (around line 600-630)
   useEffect(() => {
     const stepData = multiStepData[templateCode]?.steps?.[activeStepIndex] as
       | ExtendedStepCurlData
@@ -1318,6 +1373,11 @@ export function RequestResponseMapper() {
       // Load override configs
       if (stepData.overrideFieldConfigs) {
         setOverrideConfigs(stepData.overrideFieldConfigs);
+      }
+
+      // Load next step
+      if (stepData.nextStep) {
+        setNextStepName(stepData.nextStep);
       }
 
       // Load nodes and edges
@@ -1337,6 +1397,12 @@ export function RequestResponseMapper() {
       // Reset to empty if no data
       setContextMappings({});
       setOverrideConfigs({});
+      // Reset next step to default based on index
+      if (activeStepIndex === 3) {
+        setNextStepName("DONE");
+      } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
+        setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
+      }
     }
   }, [
     activeStepIndex,
@@ -1651,6 +1717,20 @@ export function RequestResponseMapper() {
                 placeholder="Step name (e.g., TOKEN, QUERY)"
                 className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
               />
+
+              <select
+                value={nextStepName}
+                onChange={(e) => handleNextStepChange(e.target.value)}
+                className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+              >
+                <option value="" disabled>
+                  Select Next Step
+                </option>
+                <option value="QUERY">QUERY</option>
+                <option value="SETUP">SETUP</option>
+                <option value="PAYMENT">PAYMENT</option>
+                <option value="DONE">DONE</option>
+              </select>
 
               {error && (
                 <div className="mt-2 p-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg">
@@ -2105,7 +2185,9 @@ export function RequestResponseMapper() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
                     >
-                      <option value={""} selected defaultChecked>Select Group</option>
+                      <option value={""} selected defaultChecked>
+                        Select Group
+                      </option>
                       <option value={"Utilities & Post Paid"}>
                         Utilities & Post Paid
                       </option>

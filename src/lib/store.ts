@@ -368,6 +368,7 @@ export const useAppStore = create<AppState>()(
           (_, i) => ({
             stepIndex: i,
             stepName: stepNames[i] || `STEP_${i + 1}`,
+            nextStep: stepNames[i + 1],
             curlInput: "",
             parsedRequest: null,
             responseInput: "",
