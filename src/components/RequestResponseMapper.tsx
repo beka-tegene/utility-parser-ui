@@ -1308,7 +1308,7 @@ export function RequestResponseMapper() {
       const currentStepIdx = STEP_ORDER.indexOf(currentStepName);
 
       const existingIndex = updatedTemplates.findIndex(
-        (t: { name: string }) => t?.name === currentStepName,
+        (t: { current_step: string }) => t?.current_step === currentStepName,
       );
 
       const existingTemplate =
@@ -1351,6 +1351,7 @@ export function RequestResponseMapper() {
 
   const handleClick = async (event: any) => {
     event.preventDefault();
+    clearAllStorage();
 
     try {
       await handleParseCurl();
