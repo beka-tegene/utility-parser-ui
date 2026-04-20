@@ -903,7 +903,6 @@ export function RequestResponseMapper() {
   };
 
   // Reset workflow
-  // Reset workflow
   const handleResetWorkflow = () => {
     setWorkflowContext({ accumulated: {}, steps: [] });
     setContextFields(new Set());
@@ -1284,6 +1283,7 @@ export function RequestResponseMapper() {
     }
     return generateConfig();
   }, [activeStepIndex, stepJsonConfigs, generateConfig]);
+
   const hasUpdatedTemplateAll = useRef(false);
 
   // 2. Create a stable reference to stepResponses using useMemo
@@ -1351,7 +1351,6 @@ export function RequestResponseMapper() {
 
   const handleClick = async (event: any) => {
     event.preventDefault();
-    clearAllStorage();
 
     try {
       await handleParseCurl();
@@ -1360,7 +1359,6 @@ export function RequestResponseMapper() {
     }
   };
 
-  // Update the useEffect that loads step data (around line 600-630)
   useEffect(() => {
     const stepData = multiStepData[templateCode]?.steps?.[activeStepIndex] as
       | ExtendedStepCurlData
