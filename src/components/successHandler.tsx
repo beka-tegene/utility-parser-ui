@@ -11,7 +11,7 @@ interface ValidationConfig {
   rules: ValidationRule;
 }
 
-interface SuccessMapperItem {
+export interface SuccessMapperItem {
   key: string;
   validation: ValidationConfig;
 }
