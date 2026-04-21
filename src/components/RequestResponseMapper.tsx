@@ -1036,17 +1036,10 @@ export function RequestResponseMapper() {
     const contextMappings = currentStepData?.contextFieldMappings || {};
     const overrideConfigs = currentStepData?.overrideFieldConfigs || {};
 
-    // Build response mapper from context field mappings
-    // FIX: Use the actual response value if available, otherwise use reference
-    Object.entries(contextMappings).forEach(([path, displayName]) => {
-      const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
-
-      // Try to get the actual value from the current step's response
-      let actualValue: unknown = null;
+    const getActualValue = (path: string): unknown => {
+      // First try to get from current step response
       const currentResponse = stepResponses[activeStepIndex];
-
       if (currentResponse) {
-        // Navigate through the response object using the path
         const pathParts = path.split(/[\[\].]/).filter((p) => p);
         let current: unknown = currentResponse;
         for (const part of pathParts) {
@@ -1061,8 +1054,49 @@ export function RequestResponseMapper() {
             break;
           }
         }
-        actualValue = current;
+        if (current !== null && current !== undefined) {
+          return current;
+        }
       }
+      // Then try to get from accumulated context
+      if (workflowContext.accumulated[path]) {
+        return workflowContext.accumulated[path];
+      }
+
+      // Finally try to get from inherited context
+      if (inheritedContext[path]) {
+        return inheritedContext[path];
+      }
+
+      return null;
+    };
+    // Build response mapper from context field mappings
+    // FIX: Use the actual response value if available, otherwise use reference
+    Object.entries(contextMappings).forEach(([path, displayName]) => {
+      const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
+
+      // Try to get the actual value from the current step's response
+      const actualValue = getActualValue(path);
+      // const currentResponse = stepResponses[activeStepIndex];
+
+      // if (currentResponse) {
+      //   // Navigate through the response object using the path
+      //   const pathParts = path.split(/[\[\].]/).filter((p) => p);
+      //   let current: unknown = currentResponse;
+      //   for (const part of pathParts) {
+      //     if (
+      //       current &&
+      //       typeof current === "object" &&
+      //       part in (current as Record<string, unknown>)
+      //     ) {
+      //       current = (current as Record<string, unknown>)[part];
+      //     } else {
+      //       current = null;
+      //       break;
+      //     }
+      //   }
+      //   actualValue = current;
+      // }
 
       // Check if we found a primitive value (string, number, boolean)
       if (
@@ -1071,8 +1105,14 @@ export function RequestResponseMapper() {
         typeof actualValue !== "object"
       ) {
         // This is a static value, use it directly without {{}}
-        responseMapper[displayName] = displayName;
-        // responseMapper[displayName] = String(actualValue);
+        if (
+          typeof displayName === "string" &&
+          (displayName.includes("credit") || displayName.includes("Credit"))
+        ) {
+          responseMapper[displayName] = String(actualValue);
+        } else {
+          responseMapper[displayName] = displayName;
+        }
       } else {
         // This is a reference path, wrap in {{}}
         responseMapper[displayName] = `{{${formattedKey}}}`;
@@ -1270,6 +1310,321 @@ export function RequestResponseMapper() {
     parserCode,
     stepResponses,
   ]);
+
+  // const generateConfig = useCallback(() => {
+  //   const responseMapper: Record<string, string> = {};
+  //   const requestMapper: Record<string, any> = {};
+  //   const staticFields: Record<string, string> = {};
+  //   const credentials: Record<string, string> = {};
+  //   const overriddenRequestBody: Array<{
+  //     field: string;
+  //     value: string;
+  //     actual_mapping: string;
+  //     type: string;
+  //     max_length?: number;
+  //     min_length?: number;
+  //     pattern?: string;
+  //     required: boolean;
+  //   }> = [];
+
+  //   // Get current step's canvas state from multiStepData
+  //   const currentStepData =
+  //     multiStepData[templateCode]?.steps?.[activeStepIndex];
+  //   const contextMappings = currentStepData?.contextFieldMappings || {};
+  //   const overrideConfigs = currentStepData?.overrideFieldConfigs || {};
+
+  //   // Helper function to get actual value from response or accumulated context
+  //   const getActualValue = (path: string): unknown => {
+  //     // First try to get from current step response
+  //     const currentResponse = stepResponses[activeStepIndex];
+  //     if (currentResponse) {
+  //       const pathParts = path.split(/[\[\].]/).filter((p) => p);
+  //       let current: unknown = currentResponse;
+  //       for (const part of pathParts) {
+  //         if (
+  //           current &&
+  //           typeof current === "object" &&
+  //           part in (current as Record<string, unknown>)
+  //         ) {
+  //           current = (current as Record<string, unknown>)[part];
+  //         } else {
+  //           current = null;
+  //           break;
+  //         }
+  //       }
+  //       if (current !== null && current !== undefined) {
+  //         return current;
+  //       }
+  //     }
+
+  //     // Then try to get from accumulated context
+  //     if (workflowContext.accumulated[path]) {
+  //       return workflowContext.accumulated[path];
+  //     }
+
+  //     // Finally try to get from inherited context
+  //     if (inheritedContext[path]) {
+  //       return inheritedContext[path];
+  //     }
+
+  //     return null;
+  //   };
+
+  //   // Build response mapper from context field mappings
+  //   Object.entries(contextMappings).forEach(([path, displayName]) => {
+  //     const formattedKey = path.replace(/\[/g, ".").replace(/\]/g, "");
+  //     const actualValue = getActualValue(path);
+
+  //     // Check if we found a primitive value (string, number, boolean)
+  //     if (
+  //       actualValue !== null &&
+  //       actualValue !== undefined &&
+  //       typeof actualValue !== "object"
+  //     ) {
+  //       // This is a static value, use the actual value
+  //       responseMapper[displayName] = String(actualValue);
+  //     } else {
+  //       // This is a reference path, wrap in {{}}
+  //       responseMapper[displayName] = `{{${formattedKey}}}`;
+  //     }
+  //   });
+
+  //   // Separate collections for regular fields and array fields
+  //   const regularFields: Record<string, string> = {};
+  //   const additionalFields: Array<{ Key: string; Value: string }> = [];
+
+  //   // Build override fields from override configs
+  //   Object.values(overrideConfigs).forEach((config) => {
+  //     // Get the actual value for this field
+  //     const actualValue = getActualValue(config.actual_mapping);
+  //     const hasActualValue =
+  //       actualValue !== null &&
+  //       actualValue !== undefined &&
+  //       typeof actualValue !== "object";
+
+  //     // Determine the value to use
+  //     let finalValue: string;
+  //     if (hasActualValue) {
+  //       // Use the actual value if available
+  //       finalValue = String(actualValue);
+  //     } else if (config.value && !config.value.startsWith("request.")) {
+  //       // Use static value from config
+  //       finalValue = config.value;
+  //     } else {
+  //       // Use reference path
+  //       const formattedPath = config.actual_mapping
+  //         .replace(/\[/g, ".")
+  //         .replace(/\]/g, "");
+  //       finalValue = `{{${formattedPath}}}`;
+  //     }
+
+  //     if (currentStepName !== "PAYMENT") {
+  //       overriddenRequestBody.push({
+  //         field: config.field,
+  //         value: finalValue, // Use the determined value
+  //         actual_mapping: config.actual_mapping,
+  //         type: config.type,
+  //         required: config.required,
+  //         ...(config.max_length !== undefined && {
+  //           max_length: config.max_length,
+  //         }),
+  //         ...(config.min_length !== undefined && {
+  //           min_length: config.min_length,
+  //         }),
+  //         ...(config.pattern && { pattern: config.pattern }),
+  //       });
+  //     }
+
+  //     // Format the actual_mapping to use dots instead of brackets
+  //     const formattedPath = config.actual_mapping
+  //       .replace(/\[/g, ".")
+  //       .replace(/\]/g, "");
+
+  //     // Check if this override should go to Additional_Fields
+  //     const isArrayField =
+  //       config.field.toLowerCase().includes("limit") ||
+  //       config.field.toLowerCase().includes("additional") ||
+  //       config.field.toLowerCase().includes("field");
+
+  //     // Check if the value is a static value or actual value
+  //     if (hasActualValue) {
+  //       // Use actual value
+  //       if (isArrayField) {
+  //         additionalFields.push({
+  //           Key: config.field,
+  //           Value: String(actualValue),
+  //         });
+  //       } else {
+  //         regularFields[config.field] = String(actualValue);
+  //       }
+  //     } else if (config.value && !config.value.startsWith("request.")) {
+  //       // This is a static value, use it directly
+  //       if (isArrayField) {
+  //         additionalFields.push({
+  //           Key: config.field,
+  //           Value: config.value,
+  //         });
+  //       } else {
+  //         regularFields[config.field] = config.value;
+  //       }
+  //     } else {
+  //       // This is a reference
+  //       if (isArrayField) {
+  //         additionalFields.push({
+  //           Key: config.field,
+  //           Value: `{{${formattedPath}}}`,
+  //         });
+  //       } else {
+  //         regularFields[config.field] = `{{${formattedPath}}}`;
+  //       }
+  //     }
+  //   });
+
+  //   // ============ PAYMENT STEP SPECIFIC AUTO-CONFIGURATION ============
+  //   if (currentStepName === "PAYMENT") {
+  //     // Get actual Debit_Account_Number value from context
+  //     const debitAccountValue = getActualValue("Debit_Account_Number");
+  //     const hasDebitAccountValue =
+  //       debitAccountValue !== null && debitAccountValue !== undefined;
+
+  //     // Add Debit_Account_Number to regularFields with actual value if available
+  //     regularFields["Debit_Account_Number"] = hasDebitAccountValue
+  //       ? String(debitAccountValue)
+  //       : "{{Debit_Account_Number}}";
+
+  //     // Add to overriddenRequestBody if not already present
+  //     const debitAccountExists = overriddenRequestBody.some(
+  //       (item) => item.field === "Debit_Account_Number",
+  //     );
+
+  //     if (!debitAccountExists) {
+  //       overriddenRequestBody.push({
+  //         field: "Debit_Account_Number",
+  //         value: hasDebitAccountValue
+  //           ? String(debitAccountValue)
+  //           : "request.Debit_Account_Number",
+  //         actual_mapping: "Debit_Account_Number",
+  //         type: "string",
+  //         required: true,
+  //       });
+  //     }
+  //   }
+  //   // =================================================================
+
+  //   // Extract credentials from request body for TOKEN step
+  //   if (currentStepName === "TOKEN" && parsedRequest?.body) {
+  //     Object.entries(parsedRequest.body).forEach(([key, value]) => {
+  //       if (
+  //         typeof value === "string" &&
+  //         (key.includes("client_") ||
+  //           key.includes("secret") ||
+  //           key.includes("DEST_"))
+  //       ) {
+  //         credentials[key] = value;
+  //       }
+  //     });
+  //   }
+
+  //   // Determine step progression
+  //   const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
+  //   const currentStepIdx = STEP_ORDER.indexOf(currentStepName);
+  //   let finalNextStep = nextStepName;
+
+  //   // If nextStepName is empty or invalid, calculate default
+  //   if (!finalNextStep || finalNextStep === "") {
+  //     finalNextStep =
+  //       currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
+  //         ? STEP_ORDER[currentStepIdx + 1]
+  //         : "DONE";
+  //   }
+
+  //   // If the selected next step is the same as current, use default
+  //   if (finalNextStep === currentStepName) {
+  //     finalNextStep =
+  //       currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
+  //         ? STEP_ORDER[currentStepIdx + 1]
+  //         : "DONE";
+  //   }
+
+  //   // Build template structure matching the desired format
+  //   const template: Record<string, unknown> = {
+  //     name: currentStepName || "STEP",
+  //     parser_code: `${parserCode}_${currentStepName?.toLowerCase()}_v10`,
+  //     current_step: currentStepName || "STEP",
+  //     next_step: finalNextStep,
+  //     description: `${currentStepName?.toLowerCase()} step`,
+  //     url: parsedRequest?.url || "",
+  //     method: parsedRequest?.method || "POST",
+  //     header_type: parsedRequest?.headers || {},
+  //     authorization_mapper: {},
+  //     credentials: credentials,
+  //     static_fields: staticFields,
+  //     body: parsedRequest?.body || {},
+  //   };
+
+  //   // Build the final request_mapper
+  //   const finalRequestMapper: Record<string, any> = { ...regularFields };
+
+  //   // Add Additional_Fields if there are any
+  //   if (additionalFields.length > 0) {
+  //     finalRequestMapper.Additional_Fields = additionalFields;
+  //   }
+
+  //   // Add request_mapper if not empty
+  //   if (Object.keys(finalRequestMapper).length > 0) {
+  //     template.request_mapper = finalRequestMapper;
+  //   }
+
+  //   // Add response_mapper if not empty
+  //   if (Object.keys(responseMapper).length > 0) {
+  //     template.response_mapper = responseMapper;
+  //   }
+
+  //   // Add authorization_mapper if bearer token detected
+  //   const authHeader =
+  //     parsedRequest?.headers?.["Authorization"] ||
+  //     parsedRequest?.headers?.["authorization"];
+  //   if (authHeader?.toLowerCase().startsWith("bearer")) {
+  //     template.authorization_mapper = {
+  //       type: "Bearer",
+  //       token: "{{accumulated.access_token}}",
+  //     };
+  //   }
+
+  //   // Add to_be_overridden if not empty
+  //   if (overriddenRequestBody.length > 0) {
+  //     template.to_be_overridden = {
+  //       overridden_request_body: overriddenRequestBody,
+  //     };
+  //   }
+
+  //   // Remove undefined fields
+  //   Object.keys(template).forEach((key) => {
+  //     if (
+  //       template[key] === undefined ||
+  //       (typeof template[key] === "object" &&
+  //         template[key] !== null &&
+  //         Object.keys(template[key] as object).length === 0)
+  //     ) {
+  //       delete template[key];
+  //     }
+  //   });
+
+  //   return template;
+  // }, [
+  //   nodes,
+  //   edges,
+  //   parsedRequest,
+  //   currentStepName,
+  //   multiStepData,
+  //   templateCode,
+  //   activeStepIndex,
+  //   parserCode,
+  //   stepResponses,
+  //   workflowContext.accumulated,
+  //   inheritedContext,
+  //   nextStepName,
+  // ]);
 
   const currentConfig = useMemo(() => {
     if (stepJsonConfigs[activeStepIndex]) {
