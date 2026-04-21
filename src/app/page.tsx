@@ -10,7 +10,6 @@ import Image from "next/image";
 import logo from "@public/Logo (1).png";
 import DocumentationTab from "@/components/DocumentationTab";
 import ErrorHandling from "@/components/ErrorHandling";
-import SuccessHandler from "@/components/successHandler";
 export default function Home() {
   const {
     activeTab,
@@ -26,7 +25,6 @@ export default function Home() {
     { id: "collections", label: "Collections", icon: FolderOpen },
     { id: "test", label: "Test Console", icon: Play },
     { id: "Error", label: "Error Handling", icon: FolderOpen },
-    { id: "Success", label: "Success Handling", icon: CheckCircle },
     { id: "Documentation", label: "Documentation", icon: FolderOpen },
   ] as const;
 
@@ -114,7 +112,6 @@ export default function Home() {
         {activeTab === "test" && <TestConsole />}
         {activeTab === "collections" && <CollectionsManager />}
         {activeTab === "Error" && <ErrorHandling />}
-        {activeTab === "Success" && <SuccessHandler />}
         {activeTab === "Documentation" && <DocumentationTab />}
       </main>
     </div>

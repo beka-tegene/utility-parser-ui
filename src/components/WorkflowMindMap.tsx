@@ -45,10 +45,14 @@ import {
   Save,
   LucideDelete,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { SuccessMapperConfig, SuccessMapperModal } from "./successHandler";
 
 type FieldCategory = "request" | "response" | "context" | "override";
+
+
 interface FieldData {
   id: string;
   key: string;
@@ -968,6 +972,7 @@ interface WorkflowMindMapProps {
   onCanvasStateChange?: (state: {
     contextFieldMappings: Record<string, string>;
     overrideFieldConfigs: Record<string, OverrideFieldConfig>;
+    successMapper: any;
   }) => void;
   onManualRequestAdd?: (request: {
     method: string;
@@ -1452,6 +1457,8 @@ function WorkflowMindMapInner({
   // Use a ref to track if this is the first render
   const isFirstRender = useRef(true);
   const prevStateRef = useRef<string>("");
+  const [successMapperConfig, setSuccessMapperConfig] =
+    useState<SuccessMapperConfig | null>(null);
 
   useEffect(() => {
     if (!onCanvasStateChange) return;
@@ -1476,6 +1483,7 @@ function WorkflowMindMapInner({
         onCanvasStateChange({
           contextFieldMappings: Object.fromEntries(contextFieldMappings),
           overrideFieldConfigs: Object.fromEntries(overrideFieldConfigs),
+          successMapper: successMapperConfig,
         });
       }, 300);
 
@@ -1620,7 +1628,7 @@ function WorkflowMindMapInner({
           return updated;
         });
       }
-      
+
       toast.success(`Response field "${fieldKey}" deleted from body`);
     },
     [
@@ -1632,7 +1640,28 @@ function WorkflowMindMapInner({
       setEdges,
     ],
   );
+  // Add to your state in WorkflowMindMapInner
+  const [showSuccessMapperModal, setShowSuccessMapperModal] = useState(false);
 
+  // Add callback for saving success mapper
+  const handleSaveSuccessMapper = useCallback(
+    (config: SuccessMapperConfig) => {
+      setSuccessMapperConfig(config);
+      console.log(config);
+      
+      // Notify parent component about the success mapper config
+      if (onCanvasStateChange) {
+        onCanvasStateChange({
+          contextFieldMappings: Object.fromEntries(contextFieldMappings),
+          overrideFieldConfigs: Object.fromEntries(overrideFieldConfigs),
+          successMapper: config, // Add this to the state
+        });
+      }
+
+      toast.success("Success mapper configured!");
+    },
+    [contextFieldMappings, overrideFieldConfigs, onCanvasStateChange],
+  );
   useEffect(() => {
     const allNodes: Node[] = [];
     const allEdges: Edge[] = [];
@@ -2321,6 +2350,17 @@ function WorkflowMindMapInner({
             <FileJson className="w-4 h-4" />
             Add Response
           </button>
+          <button
+            onClick={() => setShowSuccessMapperModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 rounded-lg hover:from-green-200 hover:to-emerald-200 transition-colors font-medium border border-green-200"
+            title="Configure success conditions for this step"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Success Mapper
+            {successMapperConfig && (
+              <span className="ml-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            )}
+          </button>
         </div>
       </div>
 
@@ -2561,6 +2601,15 @@ function WorkflowMindMapInner({
           setEditingOverrideField(null);
         }}
       />
+      {showSuccessMapperModal && (
+        <SuccessMapperModal
+          isOpen={showSuccessMapperModal}
+          onClose={() => setShowSuccessMapperModal(false)}
+          onSave={handleSaveSuccessMapper}
+          initialConfig={successMapperConfig || undefined}
+          stepName={stepName || "STEP"}
+        />
+      )}
     </div>
   );
 }

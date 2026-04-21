@@ -440,8 +440,13 @@ export function RequestResponseMapper() {
     Record<number, Record<string, OverrideFieldConfig>>
   >({});
 
+  const [stepSuccessMappers, setStepSuccessMappers] = useState<
+    Record<number, any[]>
+  >({});
+
   // Get current step's override configs
   const overrideConfigs = stepOverrideConfigs[activeStepIndex] || {};
+  const currentSuccessMapper = stepSuccessMappers[activeStepIndex] || [];
 
   // Safe setter for override configs
   const setOverrideConfigs = useCallback(
@@ -495,11 +500,18 @@ export function RequestResponseMapper() {
     (state: {
       contextFieldMappings: Record<string, string>;
       overrideFieldConfigs: Record<string, OverrideFieldConfig>;
+      successMapper: any[];
     }) => {
       if (templateCode) {
         // Update local step-specific state
         setContextMappings(state.contextFieldMappings);
         setOverrideConfigs(state.overrideFieldConfigs);
+        if (state.successMapper) {
+          setStepSuccessMappers((prev) => ({
+            ...prev,
+            [activeStepIndex]: state.successMapper,
+          }));
+        }
 
         // Save to store
         updateStepCurlData(templateCode, activeStepIndex, {
@@ -508,6 +520,7 @@ export function RequestResponseMapper() {
           nodes: stepNodes[activeStepIndex] || [],
           edges: stepEdges[activeStepIndex] || [],
           nextStep: nextStepName,
+          successMapper: state.successMapper,
         });
       }
     },
@@ -1035,7 +1048,7 @@ export function RequestResponseMapper() {
       multiStepData[templateCode]?.steps?.[activeStepIndex];
     const contextMappings = currentStepData?.contextFieldMappings || {};
     const overrideConfigs = currentStepData?.overrideFieldConfigs || {};
-
+    const currentSuccessMapper = stepSuccessMappers[activeStepIndex] || [];
     const getActualValue = (path: string): unknown => {
       // First try to get from current step response
       const currentResponse = stepResponses[activeStepIndex];
@@ -1286,6 +1299,9 @@ export function RequestResponseMapper() {
       };
     }
 
+    if (currentSuccessMapper && currentSuccessMapper.length > 0) {
+      template.success_mapper = currentSuccessMapper;
+    }
     // Remove undefined fields
     Object.keys(template).forEach((key) => {
       if (
@@ -1645,6 +1661,8 @@ export function RequestResponseMapper() {
   const stableStepResponses = useMemo(() => stepResponses, [stepResponses]);
   useEffect(() => {
     // Skip the first render to prevent initial double update
+    console.log(templateAll);
+
     if (!hasUpdatedTemplateAll.current) {
       hasUpdatedTemplateAll.current = true;
       return;
@@ -1654,7 +1672,11 @@ export function RequestResponseMapper() {
       const newTemplate = currentConfig;
 
       // Don't store template if URL is empty or it's a default/incomplete template
-      if (!newTemplate.url || newTemplate.url === "") {
+      if (
+        !newTemplate.url ||
+        newTemplate.url === "" ||
+        JSON.stringify(prev) === JSON.stringify(newTemplate)
+      ) {
         return prev; // Skip storing empty/incomplete templates
       }
 
@@ -1729,6 +1751,20 @@ export function RequestResponseMapper() {
         setOverrideConfigs(stepData.overrideFieldConfigs);
       }
 
+      if (stepData.successMapper && Array.isArray(stepData.successMapper)) {
+        setStepSuccessMappers((prev) => ({
+          ...prev,
+          [activeStepIndex]: stepData.successMapper as any[],
+        }));
+      } else {
+        // Reset success mapper for this step if none exists
+        setStepSuccessMappers((prev) => {
+          const newState = { ...prev };
+          delete newState[activeStepIndex];
+          return newState;
+        });
+      }
+
       // Load next step
       if (stepData.nextStep) {
         setNextStepName(stepData.nextStep);
@@ -1751,6 +1787,11 @@ export function RequestResponseMapper() {
       // Reset to empty if no data
       setContextMappings({});
       setOverrideConfigs({});
+      setStepSuccessMappers((prev) => ({
+        ...prev,
+        [activeStepIndex]: [],
+      }));
+
       // Reset next step to default based on index
       if (activeStepIndex === 3) {
         setNextStepName("DONE");

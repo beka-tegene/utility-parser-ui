@@ -257,6 +257,7 @@ export interface StepCurlData {
   responseMappings?: MappingConnection[];
   nodes?: Node[]; // Add this
   edges?: Edge[];
+  successMapper?: any[];
 }
 
 export type ExtendedStepCurlData = StepCurlData & {
