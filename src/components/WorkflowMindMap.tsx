@@ -48,7 +48,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { SuccessMapperItem, SuccessMapperModal } from "./successHandler";
+import { SuccessMapperConfig, SuccessMapperModal } from "./successHandler";
 
 type FieldCategory = "request" | "response" | "context" | "override";
 
@@ -1458,7 +1458,7 @@ function WorkflowMindMapInner({
   const isFirstRender = useRef(true);
   const prevStateRef = useRef<string>("");
   const [successMapperConfig, setSuccessMapperConfig] =
-    useState<SuccessMapperItem[] | null>(null);
+    useState<SuccessMapperConfig | null>(null);
 
   useEffect(() => {
     if (!onCanvasStateChange) return;
@@ -1645,7 +1645,7 @@ function WorkflowMindMapInner({
 
   // Add callback for saving success mapper
   const handleSaveSuccessMapper = useCallback(
-    (config: SuccessMapperItem[]) => {
+    (config: SuccessMapperConfig | null) => {
       setSuccessMapperConfig(config);
       console.log(config);
       
