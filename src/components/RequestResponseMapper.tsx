@@ -441,7 +441,7 @@ export function RequestResponseMapper() {
   >({});
 
   const [stepSuccessMappers, setStepSuccessMappers] = useState<
-    Record<number, any[]>
+    Record<number, any>
   >({});
 
   // Get current step's override configs
@@ -500,7 +500,7 @@ export function RequestResponseMapper() {
     (state: {
       contextFieldMappings: Record<string, string>;
       overrideFieldConfigs: Record<string, OverrideFieldConfig>;
-      successMapper: any[];
+      successMapper: any;
     }) => {
       if (templateCode) {
         // Update local step-specific state
@@ -1311,7 +1311,7 @@ export function RequestResponseMapper() {
       };
     }
 
-    if (currentSuccessMapper && currentSuccessMapper.length > 0) {
+    if (currentSuccessMapper) {
       template.success_mapper = currentSuccessMapper;
     }
     // Remove undefined fields
@@ -1774,10 +1774,10 @@ export function RequestResponseMapper() {
         setOverrideConfigs(stepData.overrideFieldConfigs);
       }
 
-      if (stepData.successMapper && Array.isArray(stepData.successMapper)) {
+      if (stepData.successMapper) {
         setStepSuccessMappers((prev) => ({
           ...prev,
-          [activeStepIndex]: stepData.successMapper as any[],
+          [activeStepIndex]: stepData.successMapper as any,
         }));
       } else {
         // Reset success mapper for this step if none exists

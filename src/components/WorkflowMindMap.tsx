@@ -1651,6 +1651,7 @@ function WorkflowMindMapInner({
       
       // Notify parent component about the success mapper config
       if (onCanvasStateChange) {
+        console.log(config);
         onCanvasStateChange({
           contextFieldMappings: Object.fromEntries(contextFieldMappings),
           overrideFieldConfigs: Object.fromEntries(overrideFieldConfigs),
