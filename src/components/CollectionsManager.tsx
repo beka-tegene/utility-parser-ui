@@ -424,54 +424,6 @@ export function CollectionsManager() {
                         </div>
                       </div>
 
-                      {/* Stats Row */}
-                      <div className="grid grid-cols-2 gap-3 pt-3 border-t">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
-                            <FileText className="w-3.5 h-3.5 text-blue-600" />
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-500">Mappers</div>
-                            <div className="text-sm font-semibold text-gray-800">
-                              {steps.reduce((count: any, step: any) => {
-                                if (
-                                  step.request_mapper &&
-                                  Object.keys(step.request_mapper).length > 0
-                                )
-                                  count++;
-                                if (
-                                  step.response_mapper &&
-                                  Object.keys(step.response_mapper).length > 0
-                                )
-                                  count++;
-                                return count;
-                              }, 0)}{" "}
-                              total
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
-                            <Tag className="w-3.5 h-3.5 text-purple-600" />
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-500">
-                              Overrides
-                            </div>
-                            <div className="text-sm font-semibold text-gray-800">
-                              {steps.reduce((count: any, step: any) => {
-                                return (
-                                  count +
-                                  (step.to_be_overridden
-                                    ?.overridden_request_body?.length || 0)
-                                );
-                              }, 0)}{" "}
-                              fields
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
                       {collection.created_at && (
                         <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-4 pt-3 border-t">
                           <Calendar className="w-3 h-3" />
@@ -486,7 +438,7 @@ export function CollectionsManager() {
                     </div>
 
                     {/* Collection Actions */}
-                    <div className="border-t px-5 py-3 bg-gray-50 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="border-t px-5 py-3 bg-gray-50 flex items-center justify-between transition-opacity">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -818,7 +770,7 @@ export function CollectionsManager() {
                 </div>
 
                 {/* Card Actions */}
-                <div className="border-t px-5 py-3 bg-gray-50 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="border-t px-5 py-3 bg-gray-50 flex items-center justify-between transition-opacity">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -917,7 +869,7 @@ export function CollectionsManager() {
                               e.stopPropagation();
                               handleExportCollection(group);
                             }}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
                             title="Export"
                           >
                             <Download className="w-4 h-4" />
@@ -927,7 +879,7 @@ export function CollectionsManager() {
                               e.stopPropagation();
                               handleViewGroupCollections(group);
                             }}
-                            className="p-1.5 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50 transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1.5 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50 transition-colors"
                             title="View Collections"
                           >
                             <Eye className="w-4 h-4" />
