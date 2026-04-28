@@ -1027,7 +1027,6 @@ export function RequestResponseMapper() {
 
     return <span>{String(data)}</span>;
   };
-
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
     const requestMapper: Record<string, any> = {};
@@ -1172,10 +1171,10 @@ export function RequestResponseMapper() {
         if (isArrayField) {
           additionalFields.push({
             Key: config.field,
-            Value: config.value,
+            Value: `{{${config.value}}}`,
           });
         } else {
-          regularFields[config.field] = config.value;
+          regularFields[config.field] = `{{${config.value}}}`;
         }
       } else {
         // This is a reference
@@ -1247,21 +1246,34 @@ export function RequestResponseMapper() {
           : "DONE";
     }
 
+    let template: Record<string, unknown>;
+
     // Build template structure matching the desired format
-    const template: Record<string, unknown> = {
-      name: currentStepName || "STEP",
-      parser_code: `${parserCode}_${currentStepName?.toLowerCase()}_v10`,
-      current_step: currentStepName || "STEP",
-      next_step: finalNextStep,
-      description: `${currentStepName?.toLowerCase()} step`,
-      url: parsedRequest?.url || "",
-      method: parsedRequest?.method || "POST",
-      header_type: parsedRequest?.headers || {},
-      authorization_mapper: {},
-      credentials: credentials,
-      static_fields: staticFields,
-      body: parsedRequest?.body || {},
-    };
+    if (currentStepIdx === 2) {
+      template = {
+        name: currentStepName || "STEP",
+        parser_code: `${parserCode}_${currentStepName?.toLowerCase()}_v10`,
+        current_step: currentStepName || "STEP",
+        next_step: finalNextStep,
+        description: `${currentStepName?.toLowerCase()} step`,
+        body: setupConfig || {},
+      };
+    } else {
+      template = {
+        name: currentStepName || "STEP",
+        parser_code: `${parserCode}_${currentStepName?.toLowerCase()}_v10`,
+        current_step: currentStepName || "STEP",
+        next_step: finalNextStep,
+        description: `${currentStepName?.toLowerCase()} step`,
+        url: parsedRequest?.url || "",
+        method: parsedRequest?.method || "POST",
+        header_type: parsedRequest?.headers || {},
+        authorization_mapper: {},
+        credentials: credentials,
+        static_fields: staticFields,
+        body: parsedRequest?.body || {},
+      };
+    }
 
     // Build the final request_mapper
     const finalRequestMapper: Record<string, any> = { ...regularFields };
@@ -1653,7 +1665,7 @@ export function RequestResponseMapper() {
       }
     }
     return generateConfig();
-  }, [activeStepIndex, stepJsonConfigs, generateConfig]);
+  }, [activeStepIndex, stepJsonConfigs, generateConfig, setupConfig]);
 
   const hasUpdatedTemplateAll = useRef(false);
 
@@ -1661,8 +1673,6 @@ export function RequestResponseMapper() {
   const stableStepResponses = useMemo(() => stepResponses, [stepResponses]);
   useEffect(() => {
     // Skip the first render to prevent initial double update
-    console.log(templateAll);
-
     if (!hasUpdatedTemplateAll.current) {
       hasUpdatedTemplateAll.current = true;
       return;
@@ -1672,12 +1682,25 @@ export function RequestResponseMapper() {
       const newTemplate = currentConfig;
 
       // Don't store template if URL is empty or it's a default/incomplete template
-      if (
-        !newTemplate.url ||
-        newTemplate.url === "" ||
-        JSON.stringify(prev) === JSON.stringify(newTemplate)
-      ) {
-        return prev; // Skip storing empty/incomplete templates
+      if (currentStepName !== "SETUP") {
+        // Don't store template if URL is empty or it's a default/incomplete template
+        if (
+          !newTemplate.url ||
+          newTemplate.url === "" ||
+          JSON.stringify(prev) === JSON.stringify(newTemplate)
+        ) {
+          return prev; // Skip storing empty/incomplete templates
+        }
+      } else {
+        // For SETUP step, check if body exists and has payables
+        if (
+          !newTemplate.body ||
+          (newTemplate.body.payables &&
+            newTemplate.body.payables.length === 0) ||
+          JSON.stringify(prev) === JSON.stringify(newTemplate)
+        ) {
+          return prev;
+        }
       }
 
       const updatedTemplates = [...prev];
