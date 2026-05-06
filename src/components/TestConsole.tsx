@@ -110,7 +110,7 @@ export function TestConsole() {
               ? {
                   ...s,
                   status: "error",
-                  error: data.message || "Unknown error",
+                  error: data.message || data.error_message || "Unknown error",
                   response: data,
                   timestamp: new Date().toISOString(),
                 }
@@ -205,7 +205,7 @@ export function TestConsole() {
               ? {
                   ...s,
                   status: "error",
-                  error: data.message || "Unknown error",
+                  error: data.message || data.error_message || "Unknown error",
                   request: inputValues,
                   response: data,
                   timestamp: new Date().toISOString(),
@@ -261,7 +261,7 @@ export function TestConsole() {
 
       if (data.success) {
         console.log("hello");
-        
+
         setCurrentToken(data.next_token);
         setTestSteps((prev) =>
           prev.map((s, i) =>
@@ -302,7 +302,7 @@ export function TestConsole() {
                 },
                 body: JSON.stringify({
                   token: currentToken,
-                  payment_token:  data?.data?.id,
+                  payment_token: data?.data?.id,
                   request: {
                     Debit_Account_Number: inputValues.Debit_Account_Number,
                   },
@@ -326,7 +326,7 @@ export function TestConsole() {
               ? {
                   ...s,
                   status: "error",
-                  error: data.message || "Unknown error",
+                  error: data.message || data.error_message || "Unknown error",
                   request: inputValues,
                   response: data,
                   timestamp: new Date().toISOString(),
