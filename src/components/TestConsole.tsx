@@ -110,7 +110,7 @@ export function TestConsole() {
               ? {
                   ...s,
                   status: "error",
-                  error: data.message || data.error_message || "Unknown error",
+                  error: data.message || data.data.error_message || "Unknown error",
                   response: data,
                   timestamp: new Date().toISOString(),
                 }
@@ -205,7 +205,7 @@ export function TestConsole() {
               ? {
                   ...s,
                   status: "error",
-                  error: data.message || data.error_message || "Unknown error",
+                  error: data.message || data.data.error_message || "Unknown error",
                   request: inputValues,
                   response: data,
                   timestamp: new Date().toISOString(),
@@ -326,7 +326,7 @@ export function TestConsole() {
               ? {
                   ...s,
                   status: "error",
-                  error: data.message || data.error_message || "Unknown error",
+                  error: data.message || data.data.error_message || "Unknown error",
                   request: inputValues,
                   response: data,
                   timestamp: new Date().toISOString(),
