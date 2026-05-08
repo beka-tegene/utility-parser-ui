@@ -1082,6 +1082,8 @@ export function RequestResponseMapper() {
 
       return null;
     };
+
+    
     // Build response mapper from context field mappings
     // FIX: Use the actual response value if available, otherwise use reference
     Object.entries(contextMappings).forEach(([path, displayName]) => {
@@ -1123,14 +1125,14 @@ export function RequestResponseMapper() {
         ) {
           responseMapper[displayName] = String(actualValue);
         } else {
-          responseMapper[displayName] = displayName;
+          responseMapper[displayName] = path;
         }
       } else {
         // This is a reference path, wrap in {{}}
         responseMapper[displayName] = `{{${formattedKey}}}`;
       }
     });
-
+    
     // Separate collections for regular fields and array fields
     const regularFields: Record<string, string> = {};
     const additionalFields: Array<{ Key: string; Value: string }> = [];
