@@ -483,6 +483,21 @@ function FieldNode({ data, selected }: NodeProps<FieldData>) {
     data.editedValue = editValue;
     setIsEditingValue(false);
   };
+  //   const handleValueSave = () => {
+  //   if (data.onDelete && data.editedValue !== editValue) {
+  //     // Call the parent's onRequestValueEdit or similar callback
+  //     // The edited value needs to be passed up to update the request/response
+  //     data.editedValue = editValue;
+
+  //     // If this is a request node, we need to update the parent
+  //     if (data.category === "request" && data.onValueEdit) {
+  //       // You need to add onValueEdit to FieldData interface
+  //       // and pass it from the parent
+  //       (data as any).onValueEdit?.(data.id, editValue);
+  //     }
+  //   }
+  //   setIsEditingValue(false);
+  // };
 
   const handleDelete = () => {
     if (data.onDelete) {
@@ -1550,6 +1565,7 @@ function WorkflowMindMapInner({
 
       // Clean up context mappings, etc.
       if (contextFieldMappings.has(fieldKey)) {
+        console.log("part 3");
         setContextFieldMappings((prev) => {
           const updated = new Map(prev);
           updated.delete(fieldKey);
@@ -1604,6 +1620,7 @@ function WorkflowMindMapInner({
 
       // If this field was in context mappings, remove it
       if (contextFieldMappings.has(fieldKey)) {
+        console.log("part 4");
         setContextFieldMappings((prev) => {
           const updated = new Map(prev);
           updated.delete(fieldKey);
@@ -1880,6 +1897,7 @@ function WorkflowMindMapInner({
           displayName: v,
         })),
         onFieldRename: (originalKey: string, newName: string) => {
+          console.log("part 5");
           setContextFieldMappings((prev) => {
             const updated = new Map(prev);
             updated.set(originalKey, newName);
@@ -1887,6 +1905,7 @@ function WorkflowMindMapInner({
           });
         },
         onFieldRemove: (originalKey: string) => {
+          console.log("part 6");
           setContextFieldMappings((prev) => {
             const updated = new Map(prev);
             updated.delete(originalKey);
@@ -1964,6 +1983,7 @@ function WorkflowMindMapInner({
       ) {
         const fieldKey = sourceNode.data.originalKey || sourceNode.data.key;
         if (!contextFieldMappings.has(fieldKey)) {
+          console.log("part 7");
           setContextFieldMappings((prev) => {
             const updated = new Map(prev);
             updated.set(fieldKey, fieldKey);
@@ -2199,7 +2219,7 @@ function WorkflowMindMapInner({
         selections.forEach((item) => {
           if (!contextFieldMappings.has(item.path)) {
             const displayName = item.key.toLowerCase().replace(/\s+/g, "_");
-
+            console.log("part 8");
             setContextFieldMappings((prev) => {
               const updated = new Map(prev);
               updated.set(item.path, displayName);
@@ -2237,6 +2257,7 @@ function WorkflowMindMapInner({
         const fieldValue = node.data.value;
 
         if (contextFieldMappings.has(fieldKey)) {
+          console.log("part 9");
           setContextFieldMappings((prev) => {
             const updated = new Map(prev);
             updated.delete(fieldKey);
@@ -2248,7 +2269,8 @@ function WorkflowMindMapInner({
             ),
           );
         } else {
-          setContextFieldMappings((prev) => {            
+          console.log("part 1");
+          setContextFieldMappings((prev) => {
             if (fieldKey?.toLowerCase()?.includes("credit")) {
               const updated = new Map(prev);
               updated.set(fieldValue, fieldKey);
@@ -2399,6 +2421,7 @@ function WorkflowMindMapInner({
                 if (sourceNode) {
                   const fieldKey =
                     sourceNode.data.originalKey || sourceNode.data.key;
+                  console.log("part 2");
                   setContextFieldMappings((prev) => {
                     const updated = new Map(prev);
                     updated.delete(fieldKey);

@@ -26,17 +26,15 @@ import {
   ArrowLeft,
   CreditCard,
   Hash,
-  FileText,
   Zap,
   ShoppingCart,
   Tv,
   GraduationCap,
-  Trash,
+  Edit,
+  Save,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// Icon mapping based on collection name
-// Icon mapping based on category names
 const getCollectionIcon = (name: string) => {
   const lowerName = name.toLowerCase();
 
@@ -134,6 +132,8 @@ export function CollectionsManager() {
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedGroupData, setSelectedGroupData] = useState<any>(null);
   const [showCollectionsView, setShowCollectionsView] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<any>(null);
 
   const fetchCollections = async () => {
     setIsLoading(true);
@@ -213,6 +213,11 @@ export function CollectionsManager() {
       toast.error("Failed to delete collection");
       console.error(error);
     }
+  };
+
+  const handleEdit = (collection: any) => {
+    setEditingCollection(collection);
+    setEditModalOpen(true);
   };
 
   const handleCreateNew = () => {
@@ -452,12 +457,12 @@ export function CollectionsManager() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDelete(collection);
+                          handleEdit(collection);
                         }}
                         className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
                       >
-                        <Trash className="w-3.5 h-3.5" />
-                        Delete
+                        <Edit className="w-3.5 h-3.5" />
+                        Edit
                       </button>
                       <div className="flex items-center gap-1 text-xs text-gray-400">
                         <Eye className="w-3.5 h-3.5" />
@@ -471,6 +476,18 @@ export function CollectionsManager() {
             </div>
           )}
         </div>
+        <EditCollectionModal
+          isOpen={editModalOpen}
+          collection={editingCollection}
+          apiBaseUrl={apiBaseUrl}
+          onClose={() => {
+            setEditModalOpen(false);
+            setEditingCollection(null);
+          }}
+          onSuccess={() => {
+            fetchCollections();
+          }}
+        />
       </div>
     );
   }
@@ -893,6 +910,215 @@ export function CollectionsManager() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+interface EditCollectionModalProps {
+  isOpen: boolean;
+  collection: any;
+  apiBaseUrl: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function EditCollectionModal({
+  isOpen,
+  collection,
+  apiBaseUrl,
+  onClose,
+  onSuccess,
+}: EditCollectionModalProps) {
+  const [jsonInput, setJsonInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [isValidJson, setIsValidJson] = useState(false);
+
+  useEffect(() => {
+    if (collection && isOpen) {
+      // Format the collection data as pretty JSON
+      const formattedJson = JSON.stringify(collection, null, 2);
+      setJsonInput(formattedJson);
+      setIsValidJson(true);
+      setJsonError(null);
+    }
+  }, [collection, isOpen]);
+
+  const handleJsonChange = (value: string) => {
+    setJsonInput(value);
+    try {
+      JSON.parse(value);
+      setJsonError(null);
+      setIsValidJson(true);
+    } catch (error) {
+      setJsonError(error instanceof Error ? error.message : "Invalid JSON");
+      setIsValidJson(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!isValidJson) {
+      toast.error("Please fix JSON errors before saving");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const parsedData = JSON.parse(jsonInput);
+
+      // Extract the collection ID
+      const collectionId = collection?.id || parsedData?.id;
+
+      if (!collectionId) {
+        throw new Error("Collection ID not found");
+      }
+
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/collections`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie:
+              "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
+          },
+          body: jsonInput,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message ||
+            `HTTP ${response.status}: ${response.statusText}`,
+        );
+      }
+
+      const result = await response.json();
+      toast.success("Collection updated successfully!");
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error("Error updating collection:", error);
+      toast.error(
+        `Failed to update collection: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 rounded-t-2xl">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Edit Collection</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {collection?.name || collection?.template_code || "Collection"}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">
+                Collection JSON Configuration
+              </label>
+              {isValidJson && jsonInput && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-full">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                  <span className="text-xs text-green-600 font-medium">
+                    Valid JSON
+                  </span>
+                </div>
+              )}
+              {jsonError && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded-full">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                  <span className="text-xs text-red-600 font-medium">
+                    Invalid JSON
+                  </span>
+                </div>
+              )}
+            </div>
+            <textarea
+              value={jsonInput}
+              onChange={(e) => handleJsonChange(e.target.value)}
+              className={`w-full h-[calc(90vh-250px)] font-mono text-sm p-4 rounded-lg border focus:outline-none focus:ring-2 transition-colors resize-none ${
+                jsonError
+                  ? "border-red-300 focus:ring-red-500 bg-red-50/30"
+                  : "border-gray-300 focus:ring-blue-500 bg-gray-900 text-green-400"
+              }`}
+              spellCheck={false}
+              placeholder="Edit collection JSON here..."
+            />
+            {jsonError && (
+              <div className="mt-2 p-3 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-red-600 font-mono break-all">
+                    {jsonError}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+            <p className="text-xs text-blue-700">
+              <strong>Note:</strong> Edit the JSON configuration carefully. Make
+              sure to keep the required fields like `id`, `template_code`, and
+              `template` array. Invalid JSON will not be saved.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isLoading || !isValidJson || !jsonInput}
+            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save Changes
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
