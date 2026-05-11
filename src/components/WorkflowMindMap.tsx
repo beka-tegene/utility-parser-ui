@@ -52,7 +52,6 @@ import { SuccessMapperConfig, SuccessMapperModal } from "./successHandler";
 
 type FieldCategory = "request" | "response" | "context" | "override";
 
-
 interface FieldData {
   id: string;
   key: string;
@@ -1648,7 +1647,7 @@ function WorkflowMindMapInner({
     (config: SuccessMapperConfig | null) => {
       setSuccessMapperConfig(config);
       console.log(config);
-      
+
       // Notify parent component about the success mapper config
       if (onCanvasStateChange) {
         console.log(config);
@@ -2235,6 +2234,7 @@ function WorkflowMindMapInner({
     if (regularSelectedNodes.length > 0) {
       regularSelectedNodes.forEach((node) => {
         const fieldKey = node.data.originalKey || node.data.key;
+        const fieldValue = node.data.value;
 
         if (contextFieldMappings.has(fieldKey)) {
           setContextFieldMappings((prev) => {
@@ -2248,10 +2248,16 @@ function WorkflowMindMapInner({
             ),
           );
         } else {
-          setContextFieldMappings((prev) => {
-            const updated = new Map(prev);
-            updated.set(fieldKey, fieldKey);
-            return updated;
+          setContextFieldMappings((prev) => {            
+            if (fieldKey?.toLowerCase()?.includes("credit")) {
+              const updated = new Map(prev);
+              updated.set(fieldValue, fieldKey);
+              return updated;
+            } else {
+              const updated = new Map(prev);
+              updated.set(fieldKey, fieldKey);
+              return updated;
+            }
           });
 
           const newEdge: Edge = {

@@ -1083,7 +1083,6 @@ export function RequestResponseMapper() {
       return null;
     };
 
-    
     // Build response mapper from context field mappings
     // FIX: Use the actual response value if available, otherwise use reference
     Object.entries(contextMappings).forEach(([path, displayName]) => {
@@ -1113,6 +1112,10 @@ export function RequestResponseMapper() {
       // }
 
       // Check if we found a primitive value (string, number, boolean)
+      console.log(actualValue);
+      console.log(displayName);
+      console.log(formattedKey);
+
       if (
         actualValue !== null &&
         actualValue !== undefined &&
@@ -1121,7 +1124,8 @@ export function RequestResponseMapper() {
         // This is a static value, use it directly without {{}}
         if (
           typeof displayName === "string" &&
-          (displayName.includes("credit") || displayName.includes("Credit"))
+          (displayName.toLowerCase().includes("credit") ||
+            displayName.toLowerCase().includes("Credit"))
         ) {
           responseMapper[displayName] = String(actualValue);
         } else {
@@ -1129,10 +1133,17 @@ export function RequestResponseMapper() {
         }
       } else {
         // This is a reference path, wrap in {{}}
-        responseMapper[displayName] = `{{${formattedKey}}}`;
+        if (
+          displayName.toLowerCase().includes("credit") ||
+          displayName.toLowerCase().includes("Credit")
+        ) {
+          responseMapper[displayName] = formattedKey;
+        } else {
+          responseMapper[displayName] = `{{${formattedKey}}}`;
+        }
       }
     });
-    
+
     // Separate collections for regular fields and array fields
     const regularFields: Record<string, string> = {};
     const additionalFields: Array<{ Key: string; Value: string }> = [];
