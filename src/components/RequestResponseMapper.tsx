@@ -313,6 +313,7 @@ export function RequestResponseMapper() {
     } else {
       setNextStepName("DONE");
     }
+    
   }, [activeStepIndex]);
 
   const handleNextStepChange = useCallback(
