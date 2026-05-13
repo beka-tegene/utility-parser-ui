@@ -306,6 +306,8 @@ export function RequestResponseMapper() {
   useEffect(() => {
     if (activeStepIndex === 3) {
       setNextStepName("DONE");
+    } else if (WORKFLOW_STEPS[activeStepIndex].name === "QUERY") {
+      setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
     } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
       setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
     } else {
