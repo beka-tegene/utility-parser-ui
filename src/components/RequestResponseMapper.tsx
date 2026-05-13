@@ -304,10 +304,10 @@ export function RequestResponseMapper() {
   }, [activeStepIndex, currentStep?.name]);
 
   useEffect(() => {
-    if (activeStepIndex === 3) {
+    if (activeStepIndex === 1) {
+      setNextStepName("PAYMENT");
+    } else if (activeStepIndex === 3) {
       setNextStepName("DONE");
-    } else if (WORKFLOW_STEPS[activeStepIndex].name === "QUERY") {
-      setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
     } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
       setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
     } else {
