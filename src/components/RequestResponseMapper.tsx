@@ -313,7 +313,6 @@ export function RequestResponseMapper() {
     } else {
       setNextStepName("DONE");
     }
-    
   }, [activeStepIndex]);
 
   const handleNextStepChange = useCallback(
@@ -1287,7 +1286,9 @@ export function RequestResponseMapper() {
       setContextMappings({});
       setOverrideConfigs({});
       setStepSuccessMappers((prev) => ({ ...prev, [activeStepIndex]: [] }));
-      if (activeStepIndex === 3) {
+      if (activeStepIndex === 1) {
+        setNextStepName("PAYMENT");
+      } else if (activeStepIndex === 3) {
         setNextStepName("DONE");
       } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
         setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
