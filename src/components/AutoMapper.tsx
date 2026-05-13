@@ -90,7 +90,7 @@ export function AutoMapper({
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Context fields (always available) - matching backend sample templates
+  // Context fields (always available) - matching backend sample template
   const contextFieldsList: FieldNode[] = [
     // Accumulated fields from previous steps (TOKEN and QUERY responses)
     { id: 'acc-access_token', path: 'accumulated.access_token', label: 'access_token', type: 'string', category: 'accumulated', x: 0, y: 0 },

@@ -47,7 +47,7 @@ function DocumentationTab() {
       content: (
         <div className="prose prose-sm max-w-none">
           <p className="text-gray-600 mb-4">
-            This guide helps you understand the field keys used when configuring utility payment templates. 
+            This guide helps you understand the field keys used when configuring utility payment template. 
             These keys are used to map data between your requests and vendor APIs.
           </p>
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">

@@ -1,6 +1,6 @@
 # Utility Parser UI
 
-A visual JSON mapping tool for creating utility integration templates. Built with Next.js, React Flow, and Tailwind CSS.
+A visual JSON mapping tool for creating utility integration template. Built with Next.js, React Flow, and Tailwind CSS.
 
 ## Features
 
@@ -92,7 +92,7 @@ For precise control, use the **Request Mapping** or **Response Mapping** tabs:
 
 - **Export JSON**: Download the template as a JSON file
 - **Import JSON**: Load an existing template file
-- **Collections**: View and manage all templates from the Collections tab
+- **Collections**: View and manage all template from the Collections tab
 
 ## Configuration
 

@@ -597,12 +597,6 @@ export function createEmptyCollection(): Collection {
     template_code: "",
     name: "",
     description: "",
-    templates: [
-      createTokenTemplate(),
-      createQueryTemplate(),
-      createSetupTemplate(),
-      createPaymentTemplate(),
-    ],
     template: [
       createTokenTemplate(),
       createQueryTemplate(),

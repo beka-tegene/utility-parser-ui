@@ -21,7 +21,7 @@ export function TemplateBuilder() {
   const [activeSection, setActiveSection] = useState<'config' | 'mapper' | 'override'>('config');
 
   const currentCollection = useMemo(() => collection || createEmptyCollection(), [collection]);
-  const currentTemplate = useMemo(() => currentCollection.templates[currentTemplateIndex] || createEmptyTemplate(0), [currentCollection.templates, currentTemplateIndex]);
+  const currentTemplate = useMemo(() => currentCollection.template[currentTemplateIndex] || createEmptyTemplate(0), [currentCollection.template, currentTemplateIndex]);
 
   const isCurrentStepSetup = useMemo(() => isSetupStep(currentTemplate), [currentTemplate]);
   const currentStepNeedsAuth = useMemo(() => needsAuthorization(currentTemplate), [currentTemplate]);
@@ -32,26 +32,26 @@ export function TemplateBuilder() {
   }, [currentCollection, setCollection]);
 
   const handleTemplateChange = useCallback((field: keyof Template, value: unknown) => {
-    const updatedTemplates = [...currentCollection.templates];
-    updatedTemplates[currentTemplateIndex] = { ...currentTemplate, [field]: value };
-    setCollection({ ...currentCollection, templates: updatedTemplates });
+    const updatedTemplate = [...currentCollection.template];
+    updatedTemplate[currentTemplateIndex] = { ...currentTemplate, [field]: value };
+    setCollection({ ...currentCollection, template: updatedTemplate });
   }, [currentCollection, currentTemplate, currentTemplateIndex, setCollection]);
 
   const handleAddStep = () => {
-    const newTemplate = createEmptyTemplate(currentCollection.templates.length);
+    const newTemplate = createEmptyTemplate(currentCollection.template.length);
     setCollection({
       ...currentCollection,
-      templates: [...currentCollection.templates, newTemplate],
+      template: [...currentCollection.template, newTemplate],
     });
-    setCurrentTemplateIndex(currentCollection.templates.length);
+    setCurrentTemplateIndex(currentCollection.template.length);
   };
 
   const handleRemoveStep = (index: number) => {
-    if (currentCollection.templates.length <= 1) return;
-    const updatedTemplates = currentCollection.templates.filter((_, i) => i !== index);
-    setCollection({ ...currentCollection, templates: updatedTemplates });
-    if (currentTemplateIndex >= updatedTemplates.length) {
-      setCurrentTemplateIndex(updatedTemplates.length - 1);
+    if (currentCollection.template.length <= 1) return;
+    const updatedTemplate = currentCollection.template.filter((_, i) => i !== index);
+    setCollection({ ...currentCollection, template: updatedTemplate });
+    if (currentTemplateIndex >= updatedTemplate.length) {
+      setCurrentTemplateIndex(updatedTemplate.length - 1);
     }
   };
 
@@ -132,7 +132,7 @@ export function TemplateBuilder() {
             </button>
           </div>
           <div className="space-y-1">
-            {currentCollection.templates.map((template, index) => (
+            {currentCollection.template.map((template, index) => (
               <div
                 key={index}
                 onClick={() => setCurrentTemplateIndex(index)}
@@ -141,7 +141,7 @@ export function TemplateBuilder() {
                 }`}
               >
                 <span>{template.current_step || `Step ${index + 1}`}</span>
-                {currentCollection.templates.length > 1 && (
+                {currentCollection.template.length > 1 && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleRemoveStep(index); }}
                     className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500"

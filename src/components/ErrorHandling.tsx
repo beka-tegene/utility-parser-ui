@@ -82,7 +82,7 @@ export default function ErrorHandling() {
       const response = await fetch(
         `${apiBaseUrl}/cbesuperapp/utility/collections/noEnc`,
       );
-      if (!response.ok) throw new Error("Failed to fetch templates");
+      if (!response.ok) throw new Error("Failed to fetch template");
       const data = await response.json();
       setTemplateCodes(
         data === null ? [] : data.map((t: any) => t.template_code),
@@ -319,7 +319,7 @@ export default function ErrorHandling() {
         <div className="bg-white rounded-xl border p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Templates</p>
+              <p className="text-sm text-gray-500">Template</p>
               <p className="text-2xl font-bold text-purple-600">
                 {templateCodes.length}
               </p>
