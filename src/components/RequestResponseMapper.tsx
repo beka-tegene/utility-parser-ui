@@ -262,6 +262,7 @@ export function RequestResponseMapper() {
   const [parserCode, setParserCode] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoFile, setLogoFile] = useState();
 
   const [stepHttpMethods, setStepHttpMethods] = useState<
     Record<number, string>
@@ -304,8 +305,12 @@ export function RequestResponseMapper() {
   }, [activeStepIndex, currentStep?.name]);
 
   useEffect(() => {
+
     if (activeStepIndex === 3) {
       setNextStepName("DONE");
+    } else if (activeStepIndex === 1) {
+      // setNextStepName("PAYMENT");
+      setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
     } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
       setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
     } else {
@@ -319,6 +324,7 @@ export function RequestResponseMapper() {
         toast.error("Next step cannot be the same as current step");
         return;
       }
+
       setNextStepName(newNextStep);
 
       if (templateCode) {
@@ -1269,7 +1275,15 @@ export function RequestResponseMapper() {
           return newState;
         });
       }
-      if (stepData.nextStep) setNextStepName(stepData.nextStep);
+
+      if (stepData.nextStep) {
+        if (activeStepIndex === 1) {
+          // setNextStepName("PAYMENT");
+          setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
+        }else{
+          setNextStepName(stepData.nextStep)
+        }
+      }
       if (stepData.nodes)
         setStepNodes((prev) => ({
           ...prev,
@@ -1286,6 +1300,9 @@ export function RequestResponseMapper() {
       setStepSuccessMappers((prev) => ({ ...prev, [activeStepIndex]: [] }));
       if (activeStepIndex === 3) {
         setNextStepName("DONE");
+      } else if (activeStepIndex === 1) {
+        // setNextStepName("PAYMENT");
+        setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
       } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
         setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
       }
@@ -1306,6 +1323,10 @@ export function RequestResponseMapper() {
   const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
 
   const handleSubmitConfig = async () => {
+    if (logoUrl && collectionName && parserCode) {
+      toast.error("require logo and collection name and parser code ");
+      return;
+    }
     const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
     const templateArray = STEP_ORDER.map(
       (stepName) => templateAll[stepName],
@@ -1346,6 +1367,40 @@ export function RequestResponseMapper() {
       toast.error(
         `Failed to submit configuration: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    }
+  };
+
+  const SubmitUploadURL = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    try {
+      // setLogoFile(file.name);
+
+      const formData = new FormData();
+      formData.append("logo", file);
+
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/logos/upload`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const data = await response.json();
+
+      // adjust based on backend response
+      setLogoUrl(data.url);
+
+      console.log("Uploaded:", data);
+    } catch (error) {
+      console.log(error);
     }
   };
 
@@ -1509,13 +1564,23 @@ export function RequestResponseMapper() {
               className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
             />
           </label>
-          <label className="-space-y-0.5">
+          {/* <label className="-space-y-0.5">
             <span className="text-sm">Logo URL</span>
             <input
               type="text"
               value={logoUrl}
               onChange={(e) => setLogoUrl(e.target.value)}
               placeholder="https://example.com"
+              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
+          </label> */}
+          <label className="-space-y-0.5">
+            <span className="text-sm">Logo File</span>
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={SubmitUploadURL}
               className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
             />
           </label>

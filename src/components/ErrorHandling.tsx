@@ -20,6 +20,8 @@ import {
   Code,
   FileJson,
   Copy,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store";
@@ -45,9 +47,11 @@ interface ErrorMappingFormData {
 
 export default function ErrorHandling() {
   const [errorMappings, setErrorMappings] = useState<ErrorMapping[]>([]);
+  const [unMappedError, setUnMappedError] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [tableName, setTableName] = useState("Error");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<ErrorMappingFormData>({
     vendor_error_message: "",
@@ -76,6 +80,23 @@ export default function ErrorHandling() {
     }
   };
 
+  const fetchUnMappedError = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/unmapped-errors`,
+      );
+      if (!response.ok) throw new Error("Failed to fetch error mappings");
+      const data = await response.json();
+      setUnMappedError(data === null ? [] : data);
+    } catch (error) {
+      toast.error("Failed to load error mappings");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch template codes for dropdown
   const fetchTemplateCodes = async () => {
     try {
@@ -95,6 +116,7 @@ export default function ErrorHandling() {
   useEffect(() => {
     fetchErrorMappings();
     fetchTemplateCodes();
+    fetchUnMappedError();
   }, []);
 
   // Create or update error mapping
@@ -242,6 +264,14 @@ export default function ErrorHandling() {
     if (code >= 300) return "bg-blue-100 text-blue-800";
     if (code >= 200) return "bg-green-100 text-green-800";
     return "bg-gray-100 text-gray-800";
+  };
+
+  const [expandedRows, setExpandedRows] = useState<string[]>([]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedRows((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
   };
 
   return (
@@ -527,139 +557,419 @@ export default function ErrorHandling() {
         </div>
       )}
 
-      {/* Error Mappings Table */}
-      <div className=" px-6 pb-6">
-        {loading && errorMappings.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-          </div>
-        ) : filteredMappings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <AlertCircle className="w-10 h-10 text-gray-400" />
-            </div>
-            <p className="text-gray-600 mb-2">No error mappings found</p>
-            <p className="text-sm text-gray-400">
-              {searchQuery
-                ? "Try a different search term"
-                : "Click 'Add Error Mapping' to create one"}
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Vendor Error Message
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Display Message
-                    </th>
-                    <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Status Code
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Template Code
-                    </th>
-                    <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="text-right px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredMappings.map((mapping) => (
-                    <tr
-                      key={mapping.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 max-w-80">
-                          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                          <code className="text-sm font-mono text-gray-700 break-all">
-                            {mapping.vendor_error_message}
-                          </code>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 max-w-60">
-                        <div className="text-sm text-gray-700">
-                          {mapping.display_message}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center max-w-40">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusCodeColor(mapping.http_status_code)}`}
-                        >
-                          {mapping.http_status_code}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono text-purple-600">
-                          {mapping.template_code}
-                        </code>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => toggleActive(mapping)}
-                          className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full border transition-colors ${getStatusBadge(mapping.is_active)}`}
-                        >
-                          {mapping.is_active ? (
-                            <span className="flex items-center gap-1">
-                              <Eye className="w-3 h-3" />
-                              Active
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <EyeOff className="w-3 h-3" />
-                              Inactive
-                            </span>
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleEdit(mapping)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              mapping.id && handleDelete(mapping.id)
-                            }
-                            className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(
-                                JSON.stringify(mapping, null, 2),
-                              );
-                              toast.success("Copied to clipboard");
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Copy JSON"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+      <div className="flex items-center gap-3 px-6 pb-3">
+        <button
+          onClick={() => setTableName("Error")}
+          className={`flex items-center gap-2 px-4 py-2  rounded-xl transition-all shadow-sm ${tableName === "Error" ? "hover:from-blue-700 hover:to-blue-800 bg-gradient-to-r from-blue-600 to-blue-700 text-white" : "border border-blue-600 text-blue-600"}`}
+        >
+          Error Handler
+        </button>
+        <button
+          onClick={() => setTableName("UnMapped")}
+          className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-r  rounded-xl transition-all shadow-sm ${tableName === "UnMapped" ? "hover:from-blue-700 hover:to-blue-800 bg-gradient-to-r from-blue-600 to-blue-700 text-white" : "border border-blue-600 text-blue-600"}`}
+        >
+          UnMapped Error
+        </button>
       </div>
+      {/* Error Mappings Table */}
+      {tableName === "Error" && (
+        <div className=" px-6 pb-6">
+          {loading && errorMappings.length === 0 ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+            </div>
+          ) : filteredMappings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                <AlertCircle className="w-10 h-10 text-gray-400" />
+              </div>
+              <p className="text-gray-600 mb-2">No error mappings found</p>
+              <p className="text-sm text-gray-400">
+                {searchQuery
+                  ? "Try a different search term"
+                  : "Click 'Add Error Mapping' to create one"}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Vendor Error Message
+                      </th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Display Message
+                      </th>
+                      <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Status Code
+                      </th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Template Code
+                      </th>
+                      <th className="text-center px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="text-right px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredMappings.map((mapping) => (
+                      <tr
+                        key={mapping.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 max-w-80">
+                            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            <code className="text-sm font-mono text-gray-700 break-all">
+                              {mapping.vendor_error_message}
+                            </code>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 max-w-60">
+                          <div className="text-sm text-gray-700">
+                            {mapping.display_message}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center max-w-40">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusCodeColor(mapping.http_status_code)}`}
+                          >
+                            {mapping.http_status_code}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono text-purple-600">
+                            {mapping.template_code}
+                          </code>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => toggleActive(mapping)}
+                            className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full border transition-colors ${getStatusBadge(mapping.is_active)}`}
+                          >
+                            {mapping.is_active ? (
+                              <span className="flex items-center gap-1">
+                                <Eye className="w-3 h-3" />
+                                Active
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <EyeOff className="w-3 h-3" />
+                                Inactive
+                              </span>
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleEdit(mapping)}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                mapping.id && handleDelete(mapping.id)
+                              }
+                              className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  JSON.stringify(mapping, null, 2),
+                                );
+                                toast.success("Copied to clipboard");
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                              title="Copy JSON"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {tableName === "UnMapped" && (
+        <div className=" px-6 pb-6">
+          {loading && unMappedError.length === 0 ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+            </div>
+          ) : unMappedError.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                <AlertCircle className="w-10 h-10 text-gray-400" />
+              </div>
+              <p className="text-gray-600 mb-2">No error mappings found</p>
+              <p className="text-sm text-gray-400">
+                {searchQuery
+                  ? "Try a different search term"
+                  : "Click 'Add Error Mapping' to create one"}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1400px]">
+                  <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                    <tr>
+                      <th className="w-12 px-4 py-4"></th>
+
+                      <th className="text-left px-4 py-4 text-xs font-semibold text-gray-600 uppercase">
+                        Vendor Error
+                      </th>
+
+                      <th className="text-left px-4 py-4 text-xs font-semibold text-gray-600 uppercase">
+                        Template
+                      </th>
+
+                      <th className="text-left px-4 py-4 text-xs font-semibold text-gray-600 uppercase">
+                        Parser
+                      </th>
+
+                      <th className="text-center px-4 py-4 text-xs font-semibold text-gray-600 uppercase">
+                        Count
+                      </th>
+
+                      <th className="text-left px-4 py-4 text-xs font-semibold text-gray-600 uppercase">
+                        First Seen
+                      </th>
+
+                      <th className="text-left px-4 py-4 text-xs font-semibold text-gray-600 uppercase">
+                        Last Seen
+                      </th>
+
+                      <th className="text-right px-4 py-4 text-xs font-semibold text-gray-600 uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100">
+                    {unMappedError.map((mapping) => {
+                      const expanded = expandedRows.includes(mapping.id);
+
+                      return (
+                        <React.Fragment key={mapping.id}>
+                          <tr className="hover:bg-gray-50 transition-colors align-top">
+                            <td className="px-4 py-4">
+                              <button
+                                onClick={() => toggleExpand(mapping.id)}
+                                className="text-gray-400 hover:text-gray-700"
+                              >
+                                {expanded ? (
+                                  <ChevronDown className="w-4 h-4" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4" />
+                                )}
+                              </button>
+                            </td>
+
+                            <td className="px-4 py-4 max-w-[420px]">
+                              <div className="flex items-start gap-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+
+                                <div>
+                                  <p className="text-sm font-medium text-gray-800 line-clamp-2 break-all">
+                                    {mapping.vendor_error_message}
+                                  </p>
+
+                                  <p className="text-xs text-gray-400 mt-1">
+                                    ID: {mapping.id}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <span className="inline-flex px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium font-mono">
+                                {mapping.template_code}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <span className="inline-flex px-2 py-1 rounded-md bg-purple-50 text-purple-700 text-xs font-medium font-mono">
+                                {mapping.parser_code}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-4 text-center">
+                              <span
+                                className={`inline-flex items-center justify-center min-w-[40px] px-2 py-1 rounded-full text-xs font-semibold ${
+                                  mapping.occurrence_count > 10
+                                    ? "bg-red-100 text-red-700"
+                                    : mapping.occurrence_count > 5
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : "bg-green-100 text-green-700"
+                                }`}
+                              >
+                                {mapping.occurrence_count}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
+                              {new Date(
+                                mapping.first_detected_at,
+                              ).toLocaleString()}
+                            </td>
+
+                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
+                              {new Date(
+                                mapping.last_detected_at,
+                              ).toLocaleString()}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => handleEdit(mapping)}
+                                  className="p-2 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+
+                                <button
+                                  onClick={() =>
+                                    mapping.id && handleDelete(mapping.id)
+                                  }
+                                  className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(
+                                      JSON.stringify(mapping, null, 2),
+                                    );
+
+                                    toast.success("Copied to clipboard");
+                                  }}
+                                  className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {expanded && (
+                            <tr className="bg-gray-50">
+                              <td colSpan={8} className="px-6 py-5">
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                  <div>
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                                      Vendor Response
+                                    </h4>
+
+                                    <pre className="bg-gray-900 text-green-400 text-xs rounded-xl p-4 overflow-auto max-h-[400px]">
+                                      {JSON.stringify(
+                                        mapping.vendor_response,
+                                        null,
+                                        2,
+                                      )}
+                                    </pre>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    <div className="bg-white border rounded-xl p-4">
+                                      <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                                        Error Summary
+                                      </h4>
+
+                                      <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">
+                                            Template
+                                          </span>
+
+                                          <span className="font-medium">
+                                            {mapping.template_code}
+                                          </span>
+                                        </div>
+
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">
+                                            Parser
+                                          </span>
+
+                                          <span className="font-medium">
+                                            {mapping.parser_code}
+                                          </span>
+                                        </div>
+
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-500">
+                                            Occurrences
+                                          </span>
+
+                                          <span className="font-medium">
+                                            {mapping.occurrence_count}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="bg-white border rounded-xl p-4">
+                                      <div className="flex items-start justify-between gap-3 mb-2">
+                                        <h4 className="text-sm font-semibold text-gray-700">
+                                          Full Error Message
+                                        </h4>
+
+                                        <button
+                                          onClick={() => {
+                                            navigator.clipboard.writeText(
+                                              mapping.vendor_error_message ||
+                                                "",
+                                            );
+
+                                            toast.success(
+                                              "Error message copied",
+                                            );
+                                          }}
+                                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                                          title="Copy error message"
+                                        >
+                                          <Copy className="w-4 h-4" />
+                                        </button>
+                                      </div>
+
+                                      <p className="text-sm text-red-600 break-all leading-6">
+                                        {mapping.vendor_error_message}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
