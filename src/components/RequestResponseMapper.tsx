@@ -262,7 +262,8 @@ export function RequestResponseMapper() {
   const [parserCode, setParserCode] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [logoFile, setLogoFile] = useState();
+  const [service_key, setServiceKey] = useState();
+  const [service_code, setServiceCode] = useState();
 
   const [stepHttpMethods, setStepHttpMethods] = useState<
     Record<number, string>
@@ -305,7 +306,6 @@ export function RequestResponseMapper() {
   }, [activeStepIndex, currentStep?.name]);
 
   useEffect(() => {
-
     if (activeStepIndex === 3) {
       setNextStepName("DONE");
     } else if (activeStepIndex === 1) {
@@ -1169,6 +1169,8 @@ export function RequestResponseMapper() {
       template_code: parserCode,
       description: description,
       logo: logoUrl,
+      service_key: service_key,
+      service_code: service_code,
       template: templateArray,
     };
 
@@ -1280,8 +1282,8 @@ export function RequestResponseMapper() {
         if (activeStepIndex === 1) {
           // setNextStepName("PAYMENT");
           setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
-        }else{
-          setNextStepName(stepData.nextStep)
+        } else {
+          setNextStepName(stepData.nextStep);
         }
       }
       if (stepData.nodes)
@@ -1323,7 +1325,13 @@ export function RequestResponseMapper() {
   const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
 
   const handleSubmitConfig = async () => {
-    if (logoUrl && collectionName && parserCode) {
+    if (
+      logoUrl &&
+      collectionName &&
+      parserCode &&
+      service_key &&
+      service_code
+    ) {
       toast.error("require logo and collection name and parser code ");
       return;
     }
@@ -1337,6 +1345,8 @@ export function RequestResponseMapper() {
       template_code: parserCode,
       description: description,
       logo: logoUrl,
+      service_key: service_key,
+      service_code: service_code,
       template: templateArray,
     };
 
@@ -1533,7 +1543,7 @@ export function RequestResponseMapper() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-2 py-2">
+        <div className="grid grid-cols-6 gap-2 py-2">
           <label className="-space-y-0.5">
             <span className="text-sm">Collection Name</span>
             <input
@@ -1581,6 +1591,26 @@ export function RequestResponseMapper() {
               type="file"
               accept="image/*"
               onChange={SubmitUploadURL}
+              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
+          </label>
+          <label className="-space-y-0.5">
+            <span className="text-sm">Service Key</span>
+            <input
+              type="text"
+              value={service_key}
+              onChange={(e) => setServiceKey(e.target.value)}
+              placeholder="service_key"
+              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
+          </label>
+          <label className="-space-y-0.5">
+            <span className="text-sm">Service Code</span>
+            <input
+              type="text"
+              value={service_code}
+              onChange={(e) => setServiceCode(e.target.value)}
+              placeholder="service_code"
               className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
             />
           </label>
