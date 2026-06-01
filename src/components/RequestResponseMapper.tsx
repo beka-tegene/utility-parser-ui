@@ -772,6 +772,25 @@ export function RequestResponseMapper() {
       nextStepName,
     ],
   );
+  const [serviceData, setServiceData] = useState<any>(null);
+  const serviceCodeAndKey = async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/cbesuperapp/utility/service-list`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      setServiceData(data || []);
+      console.log(res);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  useEffect(() => {
+    serviceCodeAndKey();
+  }, []);
+  console.log(serviceData);
 
   const handleStepChange = useCallback(
     (index: number) => {
@@ -1596,23 +1615,41 @@ export function RequestResponseMapper() {
           </label>
           <label className="-space-y-0.5">
             <span className="text-sm">Service Key</span>
-            <input
-              type="text"
+            <select
               value={service_key}
               onChange={(e) => setServiceKey(e.target.value)}
-              placeholder="service_key"
-              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
-            />
+              className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+            >
+              <option value="" disabled selected>
+                Select service key
+              </option>
+              {serviceData?.map(
+                (item: { service_key: string }, index: number) => (
+                  <option value={item.service_key} key={index}>
+                    {item.service_key}
+                  </option>
+                ),
+              )}
+            </select>
           </label>
           <label className="-space-y-0.5">
             <span className="text-sm">Service Code</span>
-            <input
-              type="text"
+            <select
               value={service_code}
               onChange={(e) => setServiceCode(e.target.value)}
-              placeholder="service_code"
-              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
-            />
+              className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+            >
+              <option value="" disabled selected>
+                Select service code
+              </option>
+              {serviceData?.map(
+                (item: { service_code: string }, index: number) => (
+                  <option value={item.service_code} key={index}>
+                    {item.service_code}
+                  </option>
+                ),
+              )}
+            </select>
           </label>
         </div>
       </div>
