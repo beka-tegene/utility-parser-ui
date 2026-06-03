@@ -32,8 +32,10 @@ import {
   GraduationCap,
   Edit,
   Save,
+  SwitchCamera,
 } from "lucide-react";
 import { toast } from "sonner";
+import ShowGroupModal from "./ShowGroupModal";
 
 const getCollectionIcon = (name: string) => {
   const lowerName = name.toLowerCase();
@@ -218,6 +220,66 @@ export function CollectionsManager() {
   const handleEdit = (collection: any) => {
     setEditingCollection(collection);
     setEditModalOpen(true);
+  };
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupCode, setGroupCode] = useState("");
+  const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
+  const [collectionCodes, setCollectionCodes] = useState("");
+
+  const handleSwitchAccount = (collection: any) => {
+    setShowGroupModal(true);
+    setCollectionCodes(collection.template_code);
+  };
+
+  const handleSubmitGroup = async () => {
+    if (!groupName.trim() || !groupCode.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    setIsSubmittingGroup(true);
+
+    const groupData = {
+      group_name: groupName,
+      group_code: groupCode,
+      collection_codes: [collectionCodes],
+    };
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/collections/group`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie:
+              "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
+          },
+          body: JSON.stringify(groupData),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Group created:", result);
+      toast.success("Collection and Group created successfully!");
+      setShowGroupModal(false);
+      setGroupName("");
+      setGroupCode("");
+      setCollectionCodes("");
+      fetchCollections()
+    } catch (error) {
+      console.error("Error creating group:", error);
+      toast.error(
+        `Failed to create group: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    } finally {
+      setIsSubmittingGroup(false);
+    }
   };
 
   const handleCreateNew = () => {
@@ -464,6 +526,16 @@ export function CollectionsManager() {
                         <Edit className="w-3.5 h-3.5" />
                         Edit
                       </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSwitchAccount(collection);
+                        }}
+                        className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
+                      >
+                        <SwitchCamera className="w-3.5 h-3.5" />
+                        Switch Account
+                      </button>
                       <div className="flex items-center gap-1 text-xs text-gray-400">
                         <Eye className="w-3.5 h-3.5" />
                         <span>Click to Test</span>
@@ -488,6 +560,17 @@ export function CollectionsManager() {
             fetchCollections();
           }}
         />
+        {showGroupModal && (
+          <ShowGroupModal
+            setShowGroupModal={setShowGroupModal}
+            groupName={groupName}
+            setGroupName={setGroupName}
+            groupCode={groupCode}
+            setGroupCode={setGroupCode}
+            isSubmittingGroup={isSubmittingGroup}
+            handleSubmitGroup={handleSubmitGroup}
+          />
+        )}
       </div>
     );
   }
