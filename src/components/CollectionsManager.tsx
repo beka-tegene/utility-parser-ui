@@ -534,7 +534,7 @@ export function CollectionsManager() {
                         className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
                       >
                         <SwitchCamera className="w-3.5 h-3.5" />
-                        Switch Account
+                        Switch Group
                       </button>
                       <div className="flex items-center gap-1 text-xs text-gray-400">
                         <Eye className="w-3.5 h-3.5" />
