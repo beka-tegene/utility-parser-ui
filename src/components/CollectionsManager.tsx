@@ -33,6 +33,7 @@ import {
   Edit,
   Save,
   SwitchCamera,
+  CircleOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import ShowGroupModal from "./ShowGroupModal";
@@ -192,12 +193,12 @@ export function CollectionsManager() {
     URL.revokeObjectURL(url);
   };
 
-  const handleDelete = async (collection: any) => {
+  const handleDisable = async (collection: any) => {
     if (!confirm("Are you sure you want to delete this collection?")) return;
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/cbesuperapp/utility/collections/delete/${collection.id}`,
+        `${apiBaseUrl}/cbesuperapp/utility/collections/disable/${collection.id}`,
         {
           method: "POST",
           headers: {
@@ -209,10 +210,10 @@ export function CollectionsManager() {
       );
       if (!response.ok) throw new Error("Failed to delete");
 
-      toast.success("Collection deleted Successfully");
+      toast.success("Collection Disable Successfully");
       fetchCollections();
     } catch (error) {
-      toast.error("Failed to delete collection");
+      toast.error("Failed to Disable collection");
       console.error(error);
     }
   };
@@ -271,7 +272,7 @@ export function CollectionsManager() {
       setGroupName("");
       setGroupCode("");
       setCollectionCodes("");
-      fetchCollections()
+      fetchCollections();
     } catch (error) {
       console.error("Error creating group:", error);
       toast.error(
@@ -451,6 +452,16 @@ export function CollectionsManager() {
                             </p>
                           </div>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDisable(collection);
+                          }}
+                          className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
+                        >
+                          <CircleOff className="w-3.5 h-3.5" />
+                          Disable
+                        </button>
                         {collection.ussd_enabled && (
                           <div className="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-full">
                             <Smartphone className="w-3 h-3 text-green-600" />
