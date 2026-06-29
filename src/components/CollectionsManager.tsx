@@ -198,7 +198,7 @@ export function CollectionsManager() {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/cbesuperapp/utility/collections/disable/${collection.id}`,
+        `${apiBaseUrl}/cbesuperapp/utility/collections/disable/${collection.template_code}`,
         {
           method: "POST",
           headers: {
