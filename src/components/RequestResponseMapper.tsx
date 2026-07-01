@@ -255,6 +255,8 @@ export function RequestResponseMapper() {
   const [contextFields, setContextFields] = useState<Set<string>>(new Set());
   const [responseFields, setResponseFields] = useState<Set<string>>(new Set());
   const [showHistory, setShowHistory] = useState(true);
+  const [isCallbackModal, setIsCallbackModal] = useState(false);
+  const [reversable_response_code, setReversableResponseCode] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [currentStepName, setCurrentStepName] = useState("");
   const [nextStepName, setNextStepName] = useState("");
@@ -1344,6 +1346,10 @@ export function RequestResponseMapper() {
   const [responseData, setResponseData] = useState<any>(null);
   const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
 
+  const handleCallback = async () => {
+    setIsCallbackModal(true);
+  };
+
   const handleSubmitConfig = async () => {
     if (
       logoUrl &&
@@ -1355,6 +1361,7 @@ export function RequestResponseMapper() {
       toast.error("require logo and collection name and parser code ");
       return;
     }
+
     const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
     const templateArray = STEP_ORDER.map(
       (stepName) => templateAll[stepName],
@@ -1367,6 +1374,7 @@ export function RequestResponseMapper() {
       logo: logoUrl,
       service_key: service_key,
       service_code: service_code,
+      reversable_response_code: reversable_response_code,
       template: templateArray,
     };
 
@@ -1548,7 +1556,7 @@ export function RequestResponseMapper() {
               Preview
             </button>
             <button
-              onClick={handleSubmitConfig}
+              onClick={handleCallback}
               disabled={workflowContext.steps.length === 0}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-600 rounded-md text-xs font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
@@ -1563,6 +1571,61 @@ export function RequestResponseMapper() {
             </button>
           </div>
         </div>
+        {isCallbackModal && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => setIsCallbackModal(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800">
+                  Create Reversal Code
+                </h3>
+                <button
+                  onClick={() => setIsCallbackModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="space-y-4"></div>
+              <div>
+                <label className="-space-y-0.5">
+                  <span className="text-sm">Reversal Code</span>
+                  <input
+                    type="text"
+                    value={reversable_response_code.join(", ")}
+                    onChange={(e) => {
+                      const values = e.target.value
+                        .split(",")
+                        .map((item) => item.trim());
+                      setReversableResponseCode(values);
+                    }}
+                    placeholder="reversal code"
+                    className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  />
+                </label>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-6 border-t mt-4">
+                <button
+                  onClick={() => setIsCallbackModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitConfig}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-6 gap-2 py-2">
           <label className="-space-y-0.5">
             <span className="text-sm">Collection Name</span>
