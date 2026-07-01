@@ -1471,9 +1471,9 @@ function WorkflowMindMapInner({
   // Use a ref to track if this is the first render
   const isFirstRender = useRef(true);
   const prevStateRef = useRef<string>("");
-  const [successMapperConfig, setSuccessMapperConfig] =
-    useState<SuccessMapperConfig | null>(null);
-
+  const [successMapperConfigs, setSuccessMapperConfigs] = useState<
+    SuccessMapperConfig[]
+  >([]);
   useEffect(() => {
     if (!onCanvasStateChange) return;
 
@@ -1497,13 +1497,18 @@ function WorkflowMindMapInner({
         onCanvasStateChange({
           contextFieldMappings: Object.fromEntries(contextFieldMappings),
           overrideFieldConfigs: Object.fromEntries(overrideFieldConfigs),
-          successMapper: successMapperConfig,
+          successMapper: successMapperConfigs,
         });
       }, 300);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [contextFieldMappings, overrideFieldConfigs, onCanvasStateChange]);
+  }, [
+    contextFieldMappings,
+    overrideFieldConfigs,
+    onCanvasStateChange,
+    successMapperConfigs,
+  ]);
 
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodesList }: { nodes: Node[] }) => {
@@ -1661,8 +1666,8 @@ function WorkflowMindMapInner({
 
   // Add callback for saving success mapper
   const handleSaveSuccessMapper = useCallback(
-    (config: SuccessMapperConfig | null) => {
-      setSuccessMapperConfig(config);
+    (config: SuccessMapperConfig[] | null) => {
+      setSuccessMapperConfigs(config || []);
       console.log(config);
 
       // Notify parent component about the success mapper config
@@ -2386,7 +2391,7 @@ function WorkflowMindMapInner({
           >
             <CheckCircle2 className="w-4 h-4" />
             Success Mapper
-            {successMapperConfig && (
+            {successMapperConfigs && (
               <span className="ml-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             )}
           </button>
@@ -2636,8 +2641,14 @@ function WorkflowMindMapInner({
           isOpen={showSuccessMapperModal}
           onClose={() => setShowSuccessMapperModal(false)}
           onSave={handleSaveSuccessMapper}
-          initialConfig={successMapperConfig || undefined}
+          initialConfigs={
+            successMapperConfigs.length > 0 ? successMapperConfigs : undefined
+          }
           stepName={stepName || "STEP"}
+          responseFields={nodes
+            .filter((n) => n.data?.category === "response")
+            .map((n) => n.data?.originalKey || n.data?.key)
+            .filter(Boolean)}
         />
       )}
     </div>
