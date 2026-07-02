@@ -256,7 +256,10 @@ export function RequestResponseMapper() {
   const [responseFields, setResponseFields] = useState<Set<string>>(new Set());
   const [showHistory, setShowHistory] = useState(true);
   const [isCallbackModal, setIsCallbackModal] = useState(false);
-  const [reversable_response_code, setReversableResponseCode] = useState<string[]>([]);
+  const [reversable_response_code, setReversableResponseCode] = useState<
+    string[]
+  >([]);
+  const [reversalCode, setReversalCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [currentStepName, setCurrentStepName] = useState("");
   const [nextStepName, setNextStepName] = useState("");
@@ -1476,6 +1479,7 @@ export function RequestResponseMapper() {
 
       const result = await response.json();
       console.log("Group created:", result);
+      setIsCallbackModal(false);
       toast.success("Collection and Group created successfully!");
       setShowGroupModal(false);
       setGroupName("");
@@ -1592,22 +1596,63 @@ export function RequestResponseMapper() {
                 </button>
               </div>
               <div className="space-y-4"></div>
-              <div>
-                <label className="-space-y-0.5">
-                  <span className="text-sm">Reversal Code</span>
-                  <input
-                    type="text"
-                    value={reversable_response_code.join(", ")}
-                    onChange={(e) => {
-                      const values = e.target.value
-                        .split(",")
-                        .map((item) => item.trim());
-                      setReversableResponseCode(values);
-                    }}
-                    placeholder="reversal code"
-                    className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  />
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="text-sm font-medium">Reversal Code</span>
+
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      value={reversalCode}
+                      onChange={(e) => setReversalCode(e.target.value)}
+                      placeholder="Enter reversal code"
+                      className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const value = reversalCode.trim();
+
+                        if (!value) return;
+
+                        if (!reversable_response_code.includes(value)) {
+                          setReversableResponseCode((prev) => [...prev, value]);
+                        }
+
+                        setReversalCode("");
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </label>
+
+                {reversable_response_code.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {reversable_response_code.map((code) => (
+                      <div
+                        key={code}
+                        className="flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1"
+                      >
+                        <span className="text-sm text-purple-700">{code}</span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReversableResponseCode((prev) =>
+                              prev.filter((item) => item !== code),
+                            )
+                          }
+                          className="text-purple-600 hover:text-red-500"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-end gap-3 pt-6 border-t mt-4">
                 <button
