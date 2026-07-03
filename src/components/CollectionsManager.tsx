@@ -34,6 +34,7 @@ import {
   Save,
   SwitchCamera,
   CircleOff,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import ShowGroupModal from "./ShowGroupModal";
@@ -215,6 +216,56 @@ export function CollectionsManager() {
     } catch (error) {
       toast.error("Failed to Disable collection");
       console.error(error);
+    }
+  };
+  const [isCallbackModal, setIsCallbackModal] = useState(false);
+  const [reversable_response_code, setReversableResponseCode] = useState<
+    string[]
+  >([]);
+  const [reversalCode, setReversalCode] = useState("");
+  const handleCallback = async () => {
+    setIsCallbackModal(true);
+  };
+
+  const handleSubmitConfig = async (collection: any) => {
+    if (reversable_response_code?.length <= 0) {
+      toast.error("Please add reversable response code");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/cbesuperapp/utility/collections`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie:
+              "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
+          },
+          body: JSON.stringify({ ...collection, reversable_response_code }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message ||
+            `HTTP ${response.status}: ${response.statusText}`,
+        );
+      }
+
+      const result = await response.json();
+      toast.success("Collection updated successfully!");
+      setIsCallbackModal(false);
+    } catch (error) {
+      console.error("Error updating collection:", error);
+      toast.error(
+        `Failed to update collection: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -462,6 +513,17 @@ export function CollectionsManager() {
                           <CircleOff className="w-3.5 h-3.5" />
                           Disable
                         </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCallback();
+                          }}
+                          className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 hover:text-blue-600 transition-colors"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Edit Reversal
+                        </button>
                         {collection.ussd_enabled && (
                           <div className="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-full">
                             <Smartphone className="w-3 h-3 text-green-600" />
@@ -472,7 +534,113 @@ export function CollectionsManager() {
                         )}
                       </div>
                     </div>
+                    {isCallbackModal && (
+                      <div
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                        onClick={() => setIsCallbackModal(false)}
+                      >
+                        <div
+                          className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-gray-800">
+                              Create Reversal Code
+                            </h3>
+                            <button
+                              onClick={() => setIsCallbackModal(false)}
+                              className="p-1 hover:bg-gray-100 rounded-lg"
+                            >
+                              <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                          </div>
+                          <div className="space-y-4"></div>
+                          <div className="space-y-4">
+                            <label className="block">
+                              <span className="text-sm font-medium">
+                                Reversal Code
+                              </span>
 
+                              <div className="mt-2 flex gap-2">
+                                <input
+                                  type="text"
+                                  value={reversalCode}
+                                  onChange={(e) =>
+                                    setReversalCode(e.target.value)
+                                  }
+                                  placeholder="Enter reversal code"
+                                  className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const value = reversalCode.trim();
+
+                                    if (!value) return;
+
+                                    if (
+                                      !reversable_response_code.includes(value)
+                                    ) {
+                                      setReversableResponseCode((prev) => [
+                                        ...prev,
+                                        value,
+                                      ]);
+                                    }
+
+                                    setReversalCode("");
+                                  }}
+                                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                                >
+                                  Update
+                                </button>
+                              </div>
+                            </label>
+
+                            {reversable_response_code.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {reversable_response_code.map((code) => (
+                                  <div
+                                    key={code}
+                                    className="flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1"
+                                  >
+                                    <span className="text-sm text-purple-700">
+                                      {code}
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setReversableResponseCode((prev) =>
+                                          prev.filter((item) => item !== code),
+                                        )
+                                      }
+                                      className="text-purple-600 hover:text-red-500"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-end gap-3 pt-6 border-t mt-4">
+                            <button
+                              onClick={() => setIsCallbackModal(false)}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSubmitConfig(collection)}
+                              className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                              Update
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {/* Collection Content */}
                     <div className="p-5">
                       {/* Steps Overview */}
