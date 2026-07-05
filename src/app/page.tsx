@@ -10,6 +10,7 @@ import Image from "next/image";
 import logo from "@public/Logo (1).png";
 import DocumentationTab from "@/components/DocumentationTab";
 import ErrorHandling from "@/components/ErrorHandling";
+import AllList from "@/components/AllList";
 export default function Home() {
   const {
     activeTab,
@@ -23,6 +24,7 @@ export default function Home() {
   const tabs = [
     { id: "mapper", label: "cURL Mapper", icon: Map },
     { id: "collections", label: "Collections", icon: FolderOpen },
+    { id: "all_list", label: "All List", icon: FolderOpen },
     { id: "test", label: "Test Console", icon: Play },
     { id: "Error", label: "Error Handling", icon: FolderOpen },
     { id: "Documentation", label: "Documentation", icon: FolderOpen },
@@ -111,6 +113,7 @@ export default function Home() {
         {activeTab === "mapper" && <RequestResponseMapper />}
         {activeTab === "test" && <TestConsole />}
         {activeTab === "collections" && <CollectionsManager />}
+        {activeTab === "all_list" && <AllList />}
         {activeTab === "Error" && <ErrorHandling />}
         {activeTab === "Documentation" && <DocumentationTab />}
       </main>

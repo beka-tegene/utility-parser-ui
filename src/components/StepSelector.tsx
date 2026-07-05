@@ -12,6 +12,10 @@ import {
   Loader2,
   AlertCircle,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  X,
+  Plus,
 } from 'lucide-react';
 
 // Step type configuration with colors and icons
@@ -101,11 +105,20 @@ function StatusIndicator({ status }: { status: StepStatus }) {
   }
 }
 
+// Extended step type with ID
+interface ExtendedStep {
+  name: string;
+  index: number;
+  id: string;
+}
+
 interface StepSelectorProps {
   templateCode: string;
-  steps?: Array<{ name: string; index: number }>;
+  steps: ExtendedStep[];
   activeStepIndex: number;
   onStepChange: (index: number) => void;
+  onRemoveQuery?: (stepId: string) => void;
+  onMoveStep?: (stepId: string, direction: 'up' | 'down') => void;
   className?: string;
 }
 
@@ -114,43 +127,41 @@ export function StepSelector({
   steps,
   activeStepIndex,
   onStepChange,
+  onRemoveQuery,
+  onMoveStep,
   className = '',
 }: StepSelectorProps) {
   const { multiStepData } = useAppStore();
 
-  // Default steps if not provided
-  const stepList = useMemo(() => {
-    if (steps) return steps;
-    return [
-      { name: 'TOKEN', index: 0 },
-      { name: 'QUERY', index: 1 },
-      { name: 'SETUP', index: 2 },
-      { name: 'PAYMENT', index: 3 },
-    ];
-  }, [steps]);
-
   // Get step data for status
   const stepData = multiStepData[templateCode]?.steps || [];
 
+  // Find all query step IDs for reference
+  const queryStepIds = useMemo(() => {
+    return steps.filter(s => s.name === 'QUERY').map(s => s.id);
+  }, [steps]);
+
   return (
-    <div className={`flex items-center ${className}`}>
+    <div className={`flex items-center gap-2 ${className}`}>
       {/* Step tabs */}
       <div className="flex items-center gap-1">
-        {stepList.map((step, idx) => {
+        {steps.map((step, idx) => {
           const config = STEP_CONFIG[step.name] || STEP_CONFIG.TOKEN;
           const Icon = config.icon;
           const isActive = activeStepIndex === step.index;
           const status = stepData[step.index] ? getStepStatus(stepData[step.index]) : 'pending';
+          const isQuery = step.name === 'QUERY';
+          const queryNumber = queryStepIds.indexOf(step.id) + 1;
 
           return (
-            <div key={step.name} className="flex items-center">
+            <div key={step.id} className="flex items-center group">
               <button
                 onClick={() => onStepChange(step.index)}
-                className={`relative flex items-center gap-2 px-4 py-1 rounded transition-all duration-200 ${
+                className={`relative flex items-center gap-2 px-4 py-1 rounded-lg transition-all duration-200 ${
                   isActive
-                    ? `${config.activeBg} ${config.borderColor} border-2 shadow-md`
+                    ? `${config.activeBg} ${config.borderColor} border-2 shadow-md scale-105`
                     : `${config.bgColor} border border-transparent ${config.hoverBg}`
-                }`}
+                } ${isQuery && !isActive ? 'border border-blue-200' : ''}`}
               >
                 {/* Status indicator */}
                 <div className="absolute -top-1.5 -right-1.5 z-10">
@@ -164,11 +175,64 @@ export function StepSelector({
                 <span className={`text-xs font-semibold ${config.textColor}`}>
                   {step.name}
                 </span>
+
+                {/* Query number badge */}
+                {isQuery && (
+                  <span className="text-[9px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full">
+                    #{queryNumber}
+                  </span>
+                )}
               </button>
 
+              {/* Query controls (show on hover when active or on the specific step) */}
+              {isQuery && isActive && (
+                <div className="flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {onMoveStep && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMoveStep(step.id, 'up');
+                        }}
+                        disabled={idx === 0}
+                        className="p-0.5 text-gray-500 hover:bg-gray-200 rounded disabled:opacity-30 transition-colors"
+                        title="Move up"
+                      >
+                        <ChevronUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMoveStep(step.id, 'down');
+                        }}
+                        disabled={idx === steps.length - 1}
+                        className="p-0.5 text-gray-500 hover:bg-gray-200 rounded disabled:opacity-30 transition-colors"
+                        title="Move down"
+                      >
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    </>
+                  )}
+                  {onRemoveQuery && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveQuery(step.id);
+                      }}
+                      className="p-0.5 text-red-500 hover:bg-red-100 rounded transition-colors"
+                      title="Remove this query"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Arrow between steps */}
-              {idx < stepList.length - 1 && (
-                <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
+              {idx < steps.length - 1 && (
+                <div className="flex items-center">
+                  <ChevronRight className="w-4 h-4 text-gray-300 ml-1" />
+                </div>
               )}
             </div>
           );
@@ -176,9 +240,12 @@ export function StepSelector({
       </div>
 
       {/* Active step info */}
-      <div className="ml-4 flex items-center gap-2">
+      <div className="ml-2 flex items-center gap-2">
         <div className="text-xs text-gray-500">
-          Step <span className="font-bold text-gray-700">{activeStepIndex + 1}</span> of {stepList.length}
+          Step <span className="font-bold text-gray-700">{activeStepIndex + 1}</span> of {steps.length}
+        </div>
+        <div className="text-xs text-gray-400">
+          ({steps.filter(s => s.name === 'QUERY').length} query{steps.filter(s => s.name === 'QUERY').length > 1 ? 's' : ''})
         </div>
       </div>
     </div>
@@ -191,31 +258,24 @@ export function StepSelectorCompact({
   steps,
   activeStepIndex,
   onStepChange,
+  onRemoveQuery,
+  onMoveStep,
   className = '',
 }: StepSelectorProps) {
   const { multiStepData } = useAppStore();
 
-  const stepList = useMemo(() => {
-    if (steps) return steps;
-    return [
-      { name: 'TOKEN', index: 0 },
-      { name: 'QUERY', index: 1 },
-      { name: 'SETUP', index: 2 },
-      { name: 'PAYMENT', index: 3 },
-    ];
-  }, [steps]);
-
   const stepData = multiStepData[templateCode]?.steps || [];
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      {stepList.map((step, idx) => {
+    <div className={`flex items-center gap-1 ${className}`}>
+      {steps.map((step, idx) => {
         const config = STEP_CONFIG[step.name] || STEP_CONFIG.TOKEN;
         const isActive = activeStepIndex === step.index;
         const status = stepData[step.index] ? getStepStatus(stepData[step.index]) : 'pending';
+        const isQuery = step.name === 'QUERY';
 
         return (
-          <div key={step.name} className="flex items-center">
+          <div key={step.id} className="flex items-center group">
             <button
               onClick={() => onStepChange(step.index)}
               className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-all ${
@@ -228,7 +288,7 @@ export function StepSelectorCompact({
               {status === 'completed' ? (
                 <Check className="w-4 h-4 text-green-600" />
               ) : status === 'in_progress' ? (
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
               ) : (
                 <span className={`text-xs font-bold ${config.textColor}`}>
                   {step.name[0]}
@@ -236,9 +296,41 @@ export function StepSelectorCompact({
               )}
             </button>
 
-            {idx < stepList.length - 1 && (
+            {/* Compact query controls */}
+            {isQuery && isActive && (
+              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full shadow-lg px-1 py-0.5 border">
+                {onMoveStep && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onMoveStep(step.id, 'up'); }}
+                      disabled={idx === 0}
+                      className="p-0.5 text-gray-400 hover:bg-gray-100 rounded disabled:opacity-30"
+                    >
+                      <ChevronUp className="w-2.5 h-2.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onMoveStep(step.id, 'down'); }}
+                      disabled={idx === steps.length - 1}
+                      className="p-0.5 text-gray-400 hover:bg-gray-100 rounded disabled:opacity-30"
+                    >
+                      <ChevronDown className="w-2.5 h-2.5" />
+                    </button>
+                  </>
+                )}
+                {onRemoveQuery && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRemoveQuery(step.id); }}
+                    className="p-0.5 text-red-400 hover:bg-red-100 rounded"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {idx < steps.length - 1 && (
               <div
-                className={`w-4 h-0.5 mx-0.5 ${
+                className={`w-3 h-0.5 mx-0.5 ${
                   status === 'completed' ? 'bg-green-400' : 'bg-gray-200'
                 }`}
               />
@@ -249,3 +341,20 @@ export function StepSelectorCompact({
     </div>
   );
 }
+
+// Component for adding queries (floating button)
+export function AddQueryButton({ onAddQuery, className = '' }: { onAddQuery: () => void; className?: string }) {
+  return (
+    <button
+      onClick={onAddQuery}
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium border border-purple-300 whitespace-nowrap ${className}`}
+      title="Add a new Query step"
+    >
+      <Plus className="w-4 h-4" />
+      Add Query
+    </button>
+  );
+}
+
+// Export types
+export type { ExtendedStep, StepSelectorProps };

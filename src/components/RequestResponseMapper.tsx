@@ -73,24 +73,28 @@ interface WorkflowContext {
   steps: StepData[];
 }
 
-const WORKFLOW_STEPS = [
-  { name: "TOKEN", index: 0 },
-  { name: "QUERY", index: 1 },
-  { name: "SETUP", index: 2 },
-  { name: "PAYMENT", index: 3 },
+// Dynamic step management - start with TOKEN, one QUERY, SETUP, PAYMENT
+const getDefaultSteps = () => [
+  { name: "TOKEN", index: 0, id: "token-0" },
+  { name: "QUERY", index: 1, id: "query-1" },
+  { name: "SETUP", index: 2, id: "setup-2" },
+  { name: "PAYMENT", index: 3, id: "payment-3" },
 ];
 
 export function RequestResponseMapper() {
+  // Dynamic steps state
+  const [workflowSteps, setWorkflowSteps] = useState(() => getDefaultSteps());
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+
   const [stepJsonConfigs, setStepJsonConfigs] = useState<
-    Record<number, string>
+    Record<string, string>
   >({});
   const [jsonSaved, setJsonSaved] = useState(false);
-  const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [templateCode, setTemplateCode] = useState("DEFAULT");
 
   const [manualRequests, setManualRequests] = useState<
     Record<
-      number,
+      string,
       Array<{
         method: string;
         url: string;
@@ -101,18 +105,18 @@ export function RequestResponseMapper() {
   >({});
 
   const [manualResponses, setManualResponses] = useState<
-    Record<number, Array<Record<string, unknown>>>
+    Record<string, Array<Record<string, unknown>>>
   >({});
 
-  const [stepCurlInputs, setStepCurlInputs] = useState<Record<number, string>>(
+  const [stepCurlInputs, setStepCurlInputs] = useState<Record<string, string>>(
     {},
   );
   const [stepResponseInputs, setStepResponseInputs] = useState<
-    Record<number, string>
+    Record<string, string>
   >({});
   const [stepParsedRequests, setStepParsedRequests] = useState<
     Record<
-      number,
+      string,
       {
         method: string;
         url: string;
@@ -122,41 +126,44 @@ export function RequestResponseMapper() {
     >
   >({});
   const [stepResponses, setStepResponses] = useState<
-    Record<number, Record<string, unknown> | null>
+    Record<string, Record<string, unknown> | null>
   >({});
 
-  const [stepNodes, setStepNodes] = useState<Record<number, Node[]>>({});
-  const [stepEdges, setStepEdges] = useState<Record<number, Edge[]>>({});
+  const [stepNodes, setStepNodes] = useState<Record<string, Node[]>>({});
+  const [stepEdges, setStepEdges] = useState<Record<string, Edge[]>>({});
 
-  const nodes = stepNodes[activeStepIndex] || [];
-  const edges = stepEdges[activeStepIndex] || [];
+  const currentStepId = workflowSteps[activeStepIndex]?.id || "";
+  const currentStepName = workflowSteps[activeStepIndex]?.name || "";
+
+  const nodes = stepNodes[currentStepId] || [];
+  const edges = stepEdges[currentStepId] || [];
 
   const setNodes = useCallback(
     (nodesOrUpdater: Node[] | ((prev: Node[]) => Node[])) => {
       setStepNodes((prev) => {
-        const currentNodes = prev[activeStepIndex] || [];
+        const currentNodes = prev[currentStepId] || [];
         const newNodes =
           typeof nodesOrUpdater === "function"
             ? nodesOrUpdater(currentNodes)
             : nodesOrUpdater;
-        return { ...prev, [activeStepIndex]: newNodes };
+        return { ...prev, [currentStepId]: newNodes };
       });
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const setEdges = useCallback(
     (edgesOrUpdater: Edge[] | ((prev: Edge[]) => Edge[])) => {
       setStepEdges((prev) => {
-        const currentEdges = prev[activeStepIndex] || [];
+        const currentEdges = prev[currentStepId] || [];
         const newEdges =
           typeof edgesOrUpdater === "function"
             ? edgesOrUpdater(currentEdges)
             : edgesOrUpdater;
-        return { ...prev, [activeStepIndex]: newEdges };
+        return { ...prev, [currentStepId]: newEdges };
       });
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const onNodesChange = useCallback((changes: any) => {
@@ -167,25 +174,25 @@ export function RequestResponseMapper() {
     console.log("Edges changed", changes);
   }, []);
 
-  const curlInput = stepCurlInputs[activeStepIndex] || "";
+  const curlInput = stepCurlInputs[currentStepId] || "";
   const setCurlInput = useCallback(
     (value: string) => {
-      setStepCurlInputs((prev) => ({ ...prev, [activeStepIndex]: value }));
+      setStepCurlInputs((prev) => ({ ...prev, [currentStepId]: value }));
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
-  const responseInput = stepResponseInputs[activeStepIndex] || "";
+  const responseInput = stepResponseInputs[currentStepId] || "";
   const setResponseInput = useCallback(
     (value: string) => {
-      setStepResponseInputs((prev) => ({ ...prev, [activeStepIndex]: value }));
+      setStepResponseInputs((prev) => ({ ...prev, [currentStepId]: value }));
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const parsedRequest = useMemo(() => {
-    const original = stepParsedRequests[activeStepIndex];
-    const manuals = manualRequests[activeStepIndex] || [];
+    const original = stepParsedRequests[currentStepId];
+    const manuals = manualRequests[currentStepId] || [];
 
     if (!original && manuals.length === 0) return null;
 
@@ -208,7 +215,7 @@ export function RequestResponseMapper() {
     });
 
     return combined;
-  }, [activeStepIndex, stepParsedRequests, manualRequests]);
+  }, [currentStepId, stepParsedRequests, manualRequests]);
 
   const setParsedRequest = useCallback(
     (
@@ -219,27 +226,27 @@ export function RequestResponseMapper() {
         body: Record<string, unknown> | null;
       } | null,
     ) => {
-      setStepParsedRequests((prev) => ({ ...prev, [activeStepIndex]: value }));
+      setStepParsedRequests((prev) => ({ ...prev, [currentStepId]: value }));
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const response = useMemo(() => {
-    const original = stepResponses[activeStepIndex];
-    const manuals = manualResponses[activeStepIndex] || [];
+    const original = stepResponses[currentStepId];
+    const manuals = manualResponses[currentStepId] || [];
 
     if (!original && manuals.length === 0) return null;
 
     const combined: Record<string, unknown> = original ? { ...original } : {};
     manuals.forEach((manual) => Object.assign(combined, manual));
     return combined;
-  }, [activeStepIndex, stepResponses, manualResponses]);
+  }, [currentStepId, stepResponses, manualResponses]);
 
   const setResponse = useCallback(
     (value: Record<string, unknown> | null) => {
-      setStepResponses((prev) => ({ ...prev, [activeStepIndex]: value }));
+      setStepResponses((prev) => ({ ...prev, [currentStepId]: value }));
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const [isExecuting, setIsExecuting] = useState(false);
@@ -261,7 +268,6 @@ export function RequestResponseMapper() {
   >([]);
   const [reversalCode, setReversalCode] = useState("");
   const [copied, setCopied] = useState(false);
-  const [currentStepName, setCurrentStepName] = useState("");
   const [nextStepName, setNextStepName] = useState("");
   const [showResponseInput, setShowResponseInput] = useState(false);
   const [collectionName, setCollectionName] = useState("");
@@ -272,14 +278,14 @@ export function RequestResponseMapper() {
   const [service_code, setServiceCode] = useState<string | "">("");
 
   const [stepHttpMethods, setStepHttpMethods] = useState<
-    Record<number, string>
+    Record<string, string>
   >({});
-  const httpMethod = stepHttpMethods[activeStepIndex] || "";
+  const httpMethod = stepHttpMethods[currentStepId] || "";
   const setHttpMethod = useCallback(
     (value: string) => {
-      setStepHttpMethods((prev) => ({ ...prev, [activeStepIndex]: value }));
+      setStepHttpMethods((prev) => ({ ...prev, [currentStepId]: value }));
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const [setupConfig, setSetupConfig] = useState<{
@@ -298,58 +304,74 @@ export function RequestResponseMapper() {
     clearAllStorage,
   } = useAppStore();
 
-  const currentStep = WORKFLOW_STEPS[activeStepIndex];
-  const isSetupStep = currentStep?.name === "SETUP";
+  const isSetupStep = currentStepName === "SETUP";
 
   useEffect(() => {
     if (templateCode) {
-      initializeMultiStepData(templateCode, 4);
+      initializeMultiStepData(templateCode, workflowSteps.length);
     }
-  }, [templateCode, initializeMultiStepData]);
+  }, [templateCode, initializeMultiStepData, workflowSteps.length]);
+
+  // Get the next step name for the current step
+  const getNextStepForIndex = useCallback(
+    (index: number) => {
+      if (index === workflowSteps.length - 1) return "DONE";
+      return workflowSteps[index + 1]?.name || "DONE";
+    },
+    [workflowSteps],
+  );
+  const [nextStepId, setNextStepId] = useState<string>("");
 
   useEffect(() => {
-    setCurrentStepName(currentStep?.name || "");
-  }, [activeStepIndex, currentStep?.name]);
-
-  useEffect(() => {
-    if (activeStepIndex === 3) {
-      setNextStepName("DONE");
-    } else if (activeStepIndex === 1) {
-      // setNextStepName("PAYMENT");
-      setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
-    } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
-      setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
-    } else {
-      setNextStepName("DONE");
+    if (activeStepIndex < workflowSteps.length) {
+      const next = getNextStepForIndex(activeStepIndex);
+      setNextStepName(next);
+      // Also set the next step ID
+      const nextStep = workflowSteps.find((s) => s.name === next);
+      setNextStepId(nextStep?.id || "DONE");
     }
-  }, [activeStepIndex]);
+  }, [activeStepIndex, workflowSteps, getNextStepForIndex]);
 
   const handleNextStepChange = useCallback(
-    (newNextStep: string) => {
-      if (newNextStep === currentStepName) {
+    (selectedId: string) => {
+      if (selectedId === currentStepId) {
         toast.error("Next step cannot be the same as current step");
         return;
       }
 
-      setNextStepName(newNextStep);
+      // Find the selected step
+      const selectedStep = workflowSteps.find((s) => s.id === selectedId);
+      if (selectedId !== "DONE" && !selectedStep) {
+        toast.error("Selected step not found");
+        return;
+      }
+
+      const stepName =
+        selectedId === "DONE" ? "DONE" : selectedStep?.name || "DONE";
+
+      setNextStepId(selectedId);
+      setNextStepName(stepName);
 
       if (templateCode) {
         updateStepCurlData(templateCode, activeStepIndex, {
-          nextStep: newNextStep,
+          nextStep: stepName,
           contextFieldMappings: contextMappings,
           overrideFieldConfigs: overrideConfigs,
-          nodes: stepNodes[activeStepIndex] || [],
-          edges: stepEdges[activeStepIndex] || [],
+          nodes: stepNodes[currentStepId] || [],
+          edges: stepEdges[currentStepId] || [],
         });
       }
     },
     [
-      currentStepName,
+      currentStepId,
       templateCode,
       activeStepIndex,
       stepNodes,
       stepEdges,
       updateStepCurlData,
+      // contextMappings,
+      // overrideConfigs,
+      workflowSteps,
     ],
   );
 
@@ -359,46 +381,49 @@ export function RequestResponseMapper() {
       if (stepData.nodes) {
         setStepNodes((prev) => ({
           ...prev,
-          [activeStepIndex]: stepData.nodes || [],
+          [currentStepId]: stepData.nodes || [],
         }));
       }
       if (stepData.edges) {
         setStepEdges((prev) => ({
           ...prev,
-          [activeStepIndex]: stepData.edges || [],
+          [currentStepId]: stepData.edges || [],
         }));
       }
     }
-  }, [activeStepIndex, templateCode, multiStepData]);
+  }, [activeStepIndex, templateCode, multiStepData, currentStepId]);
 
   const inheritedContext = useMemo(() => {
     const context: Record<string, unknown> = {};
     for (let i = 0; i < activeStepIndex; i++) {
-      const stepResponse = stepResponses[i];
-      if (stepResponse) {
-        Object.entries(stepResponse).forEach(([key, value]) => {
-          if (typeof value !== "object" || value === null) {
-            context[key] = value;
-          }
-        });
+      const stepId = workflowSteps[i]?.id;
+      if (stepId) {
+        const stepResponse = stepResponses[stepId];
+        if (stepResponse) {
+          Object.entries(stepResponse).forEach(([key, value]) => {
+            if (typeof value !== "object" || value === null) {
+              context[key] = value;
+            }
+          });
+        }
       }
     }
     return context;
-  }, [activeStepIndex, stepResponses]);
+  }, [activeStepIndex, workflowSteps, stepResponses]);
 
   const currentStepData = multiStepData[templateCode]?.steps?.[activeStepIndex];
   const initialContextMappings = currentStepData?.contextFieldMappings || {};
   const initialOverrideConfigs = currentStepData?.overrideFieldConfigs || {};
 
   const [stepOverrideConfigs, setStepOverrideConfigs] = useState<
-    Record<number, Record<string, OverrideFieldConfig>>
+    Record<string, Record<string, OverrideFieldConfig>>
   >({});
   const [stepSuccessMappers, setStepSuccessMappers] = useState<
-    Record<number, any>
+    Record<string, any>
   >({});
 
-  const overrideConfigs = stepOverrideConfigs[activeStepIndex] || {};
-  const currentSuccessMapper = stepSuccessMappers[activeStepIndex] || [];
+  const overrideConfigs = stepOverrideConfigs[currentStepId] || {};
+  const currentSuccessMapper = stepSuccessMappers[currentStepId] || [];
 
   const setOverrideConfigs = useCallback(
     (
@@ -409,18 +434,18 @@ export function RequestResponseMapper() {
           ) => Record<string, OverrideFieldConfig>),
     ) => {
       setStepOverrideConfigs((prev) => {
-        const current = prev[activeStepIndex] || {};
+        const current = prev[currentStepId] || {};
         const newValue = typeof value === "function" ? value(current) : value;
-        return { ...prev, [activeStepIndex]: newValue };
+        return { ...prev, [currentStepId]: newValue };
       });
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const [stepContextMappings, setStepContextMappings] = useState<
-    Record<number, Record<string, string>>
+    Record<string, Record<string, string>>
   >({});
-  const contextMappings = stepContextMappings[activeStepIndex] || {};
+  const contextMappings = stepContextMappings[currentStepId] || {};
 
   const setContextMappings = useCallback(
     (
@@ -429,16 +454,153 @@ export function RequestResponseMapper() {
         | ((prev: Record<string, string>) => Record<string, string>),
     ) => {
       setStepContextMappings((prev) => {
-        const current = prev[activeStepIndex] || {};
+        const current = prev[currentStepId] || {};
         const newValue = typeof value === "function" ? value(current) : value;
-        return { ...prev, [activeStepIndex]: newValue };
+        return { ...prev, [currentStepId]: newValue };
       });
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const [templateAll, setTemplateAll] = useState<Record<string, any>>({});
   const isSwitchingStep = useRef(false);
+
+  // Add Query Step
+  const addQueryStep = useCallback(() => {
+    const querySteps = workflowSteps.filter((s) => s.name === "QUERY");
+    const newQueryNumber = querySteps.length + 1;
+
+    // Find the last query step index
+    const lastQueryIndex = workflowSteps.findLastIndex(
+      (s) => s.name === "QUERY",
+    );
+    const insertIndex = lastQueryIndex !== -1 ? lastQueryIndex + 1 : 1;
+
+    const newStep = {
+      name: "QUERY",
+      index: insertIndex,
+      id: `query-${Date.now()}`,
+    };
+
+    const updatedSteps = [
+      ...workflowSteps.slice(0, insertIndex),
+      newStep,
+      ...workflowSteps.slice(insertIndex).map((s) => ({
+        ...s,
+        index: s.index + 1,
+      })),
+    ];
+
+    setWorkflowSteps(updatedSteps);
+
+    // Update current step if needed
+    if (activeStepIndex >= insertIndex) {
+      setActiveStepIndex(activeStepIndex + 1);
+    }
+
+    toast.success(`Query ${newQueryNumber} added!`);
+  }, [workflowSteps, activeStepIndex]);
+
+  // Remove Query Step
+  const removeQueryStep = useCallback(
+    (stepId: string) => {
+      const querySteps = workflowSteps.filter((s) => s.name === "QUERY");
+      if (querySteps.length <= 1) {
+        toast.error("Cannot remove the last query step");
+        return;
+      }
+
+      const stepToRemove = workflowSteps.find((s) => s.id === stepId);
+      if (!stepToRemove || stepToRemove.name !== "QUERY") return;
+
+      const removeIndex = workflowSteps.findIndex((s) => s.id === stepId);
+      if (removeIndex === -1) return;
+
+      const updatedSteps = [
+        ...workflowSteps.slice(0, removeIndex),
+        ...workflowSteps.slice(removeIndex + 1).map((s) => ({
+          ...s,
+          index: s.index - 1,
+        })),
+      ];
+
+      setWorkflowSteps(updatedSteps);
+
+      // Update active step
+      if (activeStepIndex === removeIndex) {
+        setActiveStepIndex(Math.min(removeIndex, updatedSteps.length - 1));
+      } else if (activeStepIndex > removeIndex) {
+        setActiveStepIndex(activeStepIndex - 1);
+      }
+
+      // Clean up data for removed step
+      setStepCurlInputs((prev) => {
+        const updated = { ...prev };
+        delete updated[stepId];
+        return updated;
+      });
+      setStepParsedRequests((prev) => {
+        const updated = { ...prev };
+        delete updated[stepId];
+        return updated;
+      });
+      setStepResponses((prev) => {
+        const updated = { ...prev };
+        delete updated[stepId];
+        return updated;
+      });
+      setStepNodes((prev) => {
+        const updated = { ...prev };
+        delete updated[stepId];
+        return updated;
+      });
+      setStepEdges((prev) => {
+        const updated = { ...prev };
+        delete updated[stepId];
+        return updated;
+      });
+
+      toast.success("Query step removed");
+    },
+    [workflowSteps, activeStepIndex],
+  );
+
+  // Move Step
+  const moveStep = useCallback(
+    (stepId: string, direction: "up" | "down") => {
+      const currentIndex = workflowSteps.findIndex((s) => s.id === stepId);
+      if (currentIndex === -1) return;
+
+      const targetIndex =
+        direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= workflowSteps.length) return;
+
+      // Don't allow moving TOKEN, SETUP, or PAYMENT
+      const step = workflowSteps[currentIndex];
+      if (["TOKEN", "SETUP", "PAYMENT"].includes(step.name)) {
+        toast.error(`${step.name} step cannot be moved`);
+        return;
+      }
+
+      const updatedSteps = [...workflowSteps];
+      const [movedStep] = updatedSteps.splice(currentIndex, 1);
+      updatedSteps.splice(targetIndex, 0, movedStep);
+
+      // Update indices
+      updatedSteps.forEach((s, idx) => {
+        s.index = idx;
+      });
+
+      setWorkflowSteps(updatedSteps);
+
+      if (activeStepIndex === currentIndex) {
+        setActiveStepIndex(targetIndex);
+      } else if (activeStepIndex === targetIndex) {
+        setActiveStepIndex(currentIndex);
+      }
+    },
+    [workflowSteps, activeStepIndex],
+  );
 
   const generateConfig = useCallback(() => {
     const responseMapper: Record<string, string> = {};
@@ -460,10 +622,10 @@ export function RequestResponseMapper() {
       multiStepData[templateCode]?.steps?.[activeStepIndex];
     const contextMappings = currentStepData?.contextFieldMappings || {};
     const overrideConfigs = currentStepData?.overrideFieldConfigs || {};
-    const currentSuccessMapper = stepSuccessMappers[activeStepIndex] || [];
+    const currentSuccessMapper = stepSuccessMappers[currentStepId] || [];
 
     const getActualValue = (path: string): unknown => {
-      const currentResponse = stepResponses[activeStepIndex];
+      const currentResponse = stepResponses[currentStepId];
       if (currentResponse) {
         const pathParts = path.split(/[\[\].]/).filter((p) => p);
         let current: unknown = currentResponse;
@@ -596,27 +758,18 @@ export function RequestResponseMapper() {
       });
     }
 
-    const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
-    const currentStepIdx = STEP_ORDER.indexOf(currentStepName);
     let finalNextStep = nextStepName;
-
     if (!finalNextStep || finalNextStep === "") {
-      finalNextStep =
-        currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
-          ? STEP_ORDER[currentStepIdx + 1]
-          : "DONE";
+      finalNextStep = getNextStepForIndex(activeStepIndex);
     }
 
     if (finalNextStep === currentStepName) {
-      finalNextStep =
-        currentStepIdx >= 0 && currentStepIdx < STEP_ORDER.length - 1
-          ? STEP_ORDER[currentStepIdx + 1]
-          : "DONE";
+      finalNextStep = getNextStepForIndex(activeStepIndex);
     }
 
     let template: Record<string, unknown>;
 
-    if (currentStepIdx === 2) {
+    if (currentStepName === "SETUP") {
       template = {
         name: currentStepName || "STEP",
         parser_code: `${parserCode}_${currentStepName?.toLowerCase()}_v10`,
@@ -700,18 +853,20 @@ export function RequestResponseMapper() {
     nextStepName,
     setupConfig,
     stepSuccessMappers,
+    currentStepId,
+    getNextStepForIndex,
   ]);
 
   const currentConfig = useMemo(() => {
-    if (stepJsonConfigs[activeStepIndex]) {
+    if (stepJsonConfigs[currentStepId]) {
       try {
-        return JSON.parse(stepJsonConfigs[activeStepIndex]);
+        return JSON.parse(stepJsonConfigs[currentStepId]);
       } catch {
         return generateConfig();
       }
     }
     return generateConfig();
-  }, [activeStepIndex, stepJsonConfigs, generateConfig, setupConfig]);
+  }, [currentStepId, stepJsonConfigs, generateConfig, setupConfig]);
 
   const saveCurrentStepConfig = useCallback(() => {
     if (!currentConfig) return;
@@ -748,15 +903,15 @@ export function RequestResponseMapper() {
         if (state.successMapper) {
           setStepSuccessMappers((prev) => ({
             ...prev,
-            [activeStepIndex]: state.successMapper,
+            [currentStepId]: state.successMapper,
           }));
         }
 
         updateStepCurlData(templateCode, activeStepIndex, {
           contextFieldMappings: state.contextFieldMappings,
           overrideFieldConfigs: state.overrideFieldConfigs,
-          nodes: stepNodes[activeStepIndex] || [],
-          edges: stepEdges[activeStepIndex] || [],
+          nodes: stepNodes[currentStepId] || [],
+          edges: stepEdges[currentStepId] || [],
           nextStep: nextStepName,
           successMapper: state.successMapper,
         });
@@ -769,6 +924,7 @@ export function RequestResponseMapper() {
     [
       templateCode,
       activeStepIndex,
+      currentStepId,
       updateStepCurlData,
       stepNodes,
       stepEdges,
@@ -778,7 +934,9 @@ export function RequestResponseMapper() {
       nextStepName,
     ],
   );
+
   const [serviceData, setServiceData] = useState<any>(null);
+
   const serviceCodeAndKey = async () => {
     try {
       const res = await fetch(`${apiBaseUrl}/cbesuperapp/utility/service-list`);
@@ -788,15 +946,14 @@ export function RequestResponseMapper() {
 
       const data = await res.json();
       setServiceData(data || []);
-      console.log(res);
     } catch (error) {
       console.log(error);
     }
   };
+
   useEffect(() => {
     serviceCodeAndKey();
   }, []);
-  console.log(serviceData);
 
   const handleStepChange = useCallback(
     (index: number) => {
@@ -859,14 +1016,14 @@ export function RequestResponseMapper() {
 
       setStepParsedRequests((prev) => ({
         ...prev,
-        [activeStepIndex]: prev[activeStepIndex]
+        [currentStepId]: prev[currentStepId]
           ? {
-              ...prev[activeStepIndex],
+              ...prev[currentStepId],
               method: finalMethod,
               url: parsed.url,
-              headers: { ...prev[activeStepIndex].headers, ...parsed.headers },
+              headers: { ...prev[currentStepId].headers, ...parsed.headers },
               body: {
-                ...(prev[activeStepIndex].body || {}),
+                ...(prev[currentStepId].body || {}),
                 ...(bodyObj || {}),
               },
             }
@@ -907,7 +1064,7 @@ export function RequestResponseMapper() {
     currentStepName,
     workflowContext.accumulated,
     contextFields,
-    activeStepIndex,
+    currentStepId,
     saveCurrentStepConfig,
   ]);
 
@@ -939,8 +1096,8 @@ export function RequestResponseMapper() {
 
       setStepResponses((prev) => ({
         ...prev,
-        [activeStepIndex]: prev[activeStepIndex]
-          ? { ...prev[activeStepIndex], ...responseData }
+        [currentStepId]: prev[currentStepId]
+          ? { ...prev[currentStepId], ...responseData }
           : responseData,
       }));
 
@@ -998,32 +1155,32 @@ export function RequestResponseMapper() {
       if (isDeleteOperation) {
         setStepParsedRequests((prev) => ({
           ...prev,
-          [activeStepIndex]: {
+          [currentStepId]: {
             method: requestData.method,
             url: requestData.url,
             headers: requestData.headers,
             body: requestData.body,
           },
         }));
-        setManualRequests((prev) => ({ ...prev, [activeStepIndex]: [] }));
+        setManualRequests((prev) => ({ ...prev, [currentStepId]: [] }));
       } else {
         setManualRequests((prev) => ({
           ...prev,
-          [activeStepIndex]: [...(prev[activeStepIndex] || []), requestData],
+          [currentStepId]: [...(prev[currentStepId] || []), requestData],
         }));
       }
     },
-    [activeStepIndex, parsedRequest],
+    [currentStepId, parsedRequest],
   );
 
   const handleManualResponseAdd = useCallback(
     (responseData: Record<string, unknown>) => {
       setManualResponses((prev) => ({
         ...prev,
-        [activeStepIndex]: [...(prev[activeStepIndex] || []), responseData],
+        [currentStepId]: [...(prev[currentStepId] || []), responseData],
       }));
     },
-    [activeStepIndex],
+    [currentStepId],
   );
 
   const handleRequestDelete = useCallback(
@@ -1049,17 +1206,17 @@ export function RequestResponseMapper() {
       deleteByPath(updatedBody, fieldPath);
       setStepParsedRequests((prev) => ({
         ...prev,
-        [activeStepIndex]: {
+        [currentStepId]: {
           method: parsedRequest.method,
           url: parsedRequest.url,
           headers: parsedRequest.headers,
           body: updatedBody,
         },
       }));
-      setManualRequests((prev) => ({ ...prev, [activeStepIndex]: [] }));
+      setManualRequests((prev) => ({ ...prev, [currentStepId]: [] }));
       toast.success(`Field "${fieldPath}" deleted from request body`);
     },
-    [activeStepIndex, parsedRequest],
+    [currentStepId, parsedRequest],
   );
 
   const handleResponseDelete = useCallback(
@@ -1083,11 +1240,14 @@ export function RequestResponseMapper() {
       };
 
       deleteByPath(updatedBody, fieldPath);
-      setStepResponses((prev) => ({ ...prev, [activeStepIndex]: updatedBody }));
-      setManualResponses((prev) => ({ ...prev, [activeStepIndex]: [] }));
+      setStepResponses((prev) => ({
+        ...prev,
+        [currentStepId]: updatedBody,
+      }));
+      setManualResponses((prev) => ({ ...prev, [currentStepId]: [] }));
       toast.success(`Field "${fieldPath}" deleted from response body`);
     },
-    [activeStepIndex, response],
+    [currentStepId, response],
   );
 
   const handleSetManualResponse = () => {
@@ -1101,8 +1261,8 @@ export function RequestResponseMapper() {
       const responseData = JSON.parse(responseInput);
       setStepResponses((prev) => ({
         ...prev,
-        [activeStepIndex]: prev[activeStepIndex]
-          ? { ...prev[activeStepIndex], ...responseData }
+        [currentStepId]: prev[currentStepId]
+          ? { ...prev[currentStepId], ...responseData }
           : responseData,
       }));
       setShowResponseInput(false);
@@ -1140,7 +1300,6 @@ export function RequestResponseMapper() {
     setResponse(null);
     setCurlInput("");
     setResponseInput("");
-    setCurrentStepName("");
     setNextStepName("");
     setShowResponseInput(false);
     setManualRequests({});
@@ -1155,39 +1314,14 @@ export function RequestResponseMapper() {
     window.location.reload();
     clearAllStorage();
   };
+
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewJson, setPreviewJson] = useState("");
 
-  // const handleExportConfig = () => {
-  //   const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
-  //   const templateArray = STEP_ORDER.map(
-  //     (stepName) => templateAll[stepName],
-  //   ).filter((template) => template && template.url);
-
-  //   const config = {
-  //     name: collectionName,
-  //     template_code: parserCode,
-  //     description: description,
-  //     logo: logoUrl,
-  //     template: templateArray,
-  //   };
-
-  //   const blob = new Blob([JSON.stringify(config, null, 2)], {
-  //     type: "application/json",
-  //   });
-  //   const url = URL.createObjectURL(blob);
-  //   const a = document.createElement("a");
-  //   a.href = url;
-  //   a.download = "workflow-config.json";
-  //   a.click();
-  //   URL.revokeObjectURL(url);
-  // };
-
   const handlePreviewConfig = () => {
-    const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
-    const templateArray = STEP_ORDER.map(
-      (stepName) => templateAll[stepName],
-    ).filter((template) => template && template.url);
+    const templateArray = workflowSteps
+      .map((step) => templateAll[step.name])
+      .filter((template) => template && template.url);
 
     const config = {
       name: collectionName,
@@ -1202,6 +1336,7 @@ export function RequestResponseMapper() {
     setPreviewJson(JSON.stringify(config, null, 2));
     setShowPreviewModal(true);
   };
+
   const handleCopy = (data: unknown) => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
     setCopied(true);
@@ -1293,53 +1428,43 @@ export function RequestResponseMapper() {
       if (stepData.successMapper) {
         setStepSuccessMappers((prev) => ({
           ...prev,
-          [activeStepIndex]: stepData.successMapper as any,
+          [currentStepId]: stepData.successMapper as any,
         }));
       } else {
         setStepSuccessMappers((prev) => {
           const newState = { ...prev };
-          delete newState[activeStepIndex];
+          delete newState[currentStepId];
           return newState;
         });
       }
 
       if (stepData.nextStep) {
-        if (activeStepIndex === 1) {
-          // setNextStepName("PAYMENT");
-          setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
-        } else {
-          setNextStepName(stepData.nextStep);
-        }
+        setNextStepName(stepData.nextStep);
       }
       if (stepData.nodes)
         setStepNodes((prev) => ({
           ...prev,
-          [activeStepIndex]: stepData.nodes || [],
+          [currentStepId]: stepData.nodes || [],
         }));
       if (stepData.edges)
         setStepEdges((prev) => ({
           ...prev,
-          [activeStepIndex]: stepData.edges || [],
+          [currentStepId]: stepData.edges || [],
         }));
     } else {
       setContextMappings({});
       setOverrideConfigs({});
-      setStepSuccessMappers((prev) => ({ ...prev, [activeStepIndex]: [] }));
-      if (activeStepIndex === 3) {
-        setNextStepName("DONE");
-      } else if (activeStepIndex === 1) {
-        // setNextStepName("PAYMENT");
-        setNextStepName(WORKFLOW_STEPS[activeStepIndex + 2].name);
-      } else if (WORKFLOW_STEPS[activeStepIndex + 1]) {
-        setNextStepName(WORKFLOW_STEPS[activeStepIndex + 1].name);
-      }
+      setStepSuccessMappers((prev) => ({ ...prev, [currentStepId]: [] }));
+      setNextStepName(getNextStepForIndex(activeStepIndex));
     }
   }, [
     activeStepIndex,
     templateCode,
     multiStepData,
+    currentStepId,
     setContextMappings,
     setOverrideConfigs,
+    getNextStepForIndex,
   ]);
 
   const [showGroupModal, setShowGroupModal] = useState(false);
@@ -1355,20 +1480,19 @@ export function RequestResponseMapper() {
 
   const handleSubmitConfig = async () => {
     if (
-      logoUrl &&
-      collectionName &&
-      parserCode &&
-      service_key &&
-      service_code
+      !logoUrl ||
+      !collectionName ||
+      !parserCode ||
+      !service_key ||
+      !service_code
     ) {
-      toast.error("require logo and collection name and parser code ");
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    const STEP_ORDER = ["TOKEN", "QUERY", "SETUP", "PAYMENT", "DONE"];
-    const templateArray = STEP_ORDER.map(
-      (stepName) => templateAll[stepName],
-    ).filter((template) => template && template.url);
+    const templateArray = workflowSteps
+      .map((step) => templateAll[step.name])
+      .filter((template) => template && template.url);
 
     const collectionConfig = {
       name: collectionName,
@@ -1388,8 +1512,6 @@ export function RequestResponseMapper() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Cookie:
-              "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
           },
           body: JSON.stringify(collectionConfig),
         },
@@ -1400,7 +1522,6 @@ export function RequestResponseMapper() {
       }
 
       const collectionResult = await collectionResponse.json();
-      console.log("Collection created:", collectionResult);
       setResponseData(collectionResult);
       setShowGroupModal(true);
     } catch (error) {
@@ -1417,8 +1538,6 @@ export function RequestResponseMapper() {
     if (!file) return;
 
     try {
-      // setLogoFile(file.name);
-
       const formData = new FormData();
       formData.append("logo", file);
 
@@ -1435,11 +1554,7 @@ export function RequestResponseMapper() {
       }
 
       const data = await response.json();
-
-      // adjust based on backend response
       setLogoUrl(data.url);
-
-      console.log("Uploaded:", data);
     } catch (error) {
       console.log(error);
     }
@@ -1456,7 +1571,7 @@ export function RequestResponseMapper() {
     const groupData = {
       group_name: groupName,
       group_code: groupCode,
-      collection_codes: [responseData.template_code],
+      collection_codes: [responseData?.template_code || parserCode],
     };
 
     try {
@@ -1466,8 +1581,6 @@ export function RequestResponseMapper() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Cookie:
-              "c68abbf6e7b79451c37ff174bb734d90=3193314271c7f54c666bb299e3299b35",
           },
           body: JSON.stringify(groupData),
         },
@@ -1536,21 +1649,6 @@ export function RequestResponseMapper() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* <button
-              onClick={handleManualSave}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-600 rounded-md text-xs font-medium hover:bg-green-200 transition-colors"
-            >
-              <Save className="w-3.5 h-3.5" />
-              Save Step
-            </button> */}
-            {/* <button
-              onClick={handleExportConfig}
-              disabled={workflowContext.steps.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-600 rounded-md text-xs font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export
-            </button> */}
             <button
               onClick={handlePreviewConfig}
               disabled={workflowContext.steps.length === 0}
@@ -1575,6 +1673,7 @@ export function RequestResponseMapper() {
             </button>
           </div>
         </div>
+
         {isCallbackModal && (
           <div
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -1595,11 +1694,9 @@ export function RequestResponseMapper() {
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
-              <div className="space-y-4"></div>
               <div className="space-y-4">
                 <label className="block">
                   <span className="text-sm font-medium">Reversal Code</span>
-
                   <div className="mt-2 flex gap-2">
                     <input
                       type="text"
@@ -1608,18 +1705,14 @@ export function RequestResponseMapper() {
                       placeholder="Enter reversal code"
                       className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
                     />
-
                     <button
                       type="button"
                       onClick={() => {
                         const value = reversalCode.trim();
-
                         if (!value) return;
-
                         if (!reversable_response_code.includes(value)) {
                           setReversableResponseCode((prev) => [...prev, value]);
                         }
-
                         setReversalCode("");
                       }}
                       className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
@@ -1637,7 +1730,6 @@ export function RequestResponseMapper() {
                         className="flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1"
                       >
                         <span className="text-sm text-purple-700">{code}</span>
-
                         <button
                           type="button"
                           onClick={() =>
@@ -1671,6 +1763,7 @@ export function RequestResponseMapper() {
             </div>
           </div>
         )}
+
         <div className="grid grid-cols-6 gap-2 py-2">
           <label className="-space-y-0.5">
             <span className="text-sm">Collection Name</span>
@@ -1683,12 +1776,12 @@ export function RequestResponseMapper() {
             />
           </label>
           <label className="-space-y-0.5">
-            <span className="text-sm">Template Code (unique identifier)</span>
+            <span className="text-sm">Template Code</span>
             <input
               type="text"
               value={parserCode}
               onChange={(e) => setParserCode(e.target.value)}
-              placeholder="Template Code (unique identifier)"
+              placeholder="Template Code"
               className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
             />
           </label>
@@ -1702,19 +1795,8 @@ export function RequestResponseMapper() {
               className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
             />
           </label>
-          {/* <label className="-space-y-0.5">
-            <span className="text-sm">Logo URL</span>
-            <input
-              type="text"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://example.com"
-              className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
-            />
-          </label> */}
           <label className="-space-y-0.5">
             <span className="text-sm">Logo File</span>
-
             <input
               type="file"
               accept="image/*"
@@ -1729,9 +1811,7 @@ export function RequestResponseMapper() {
               onChange={(e) => setServiceKey(e.target.value)}
               className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
             >
-              <option value="" disabled selected>
-                Select service key
-              </option>
+              <option value="">Select service key</option>
               {serviceData?.map(
                 (item: { service_key: string }, index: number) => (
                   <option value={item.service_key} key={index}>
@@ -1748,9 +1828,7 @@ export function RequestResponseMapper() {
               onChange={(e) => setServiceCode(e.target.value)}
               className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
             >
-              <option value="" disabled selected>
-                Select service code
-              </option>
+              <option value="">Select service code</option>
               {serviceData?.map(
                 (item: { service_code: string }, index: number) => (
                   <option value={item.service_code} key={index}>
@@ -1763,13 +1841,28 @@ export function RequestResponseMapper() {
         </div>
       </div>
 
+      {/* Step Selector with Add Query and Remove Query buttons */}
       <div className="bg-white border-b px-6 py-2">
-        <StepSelector
-          templateCode={templateCode}
-          steps={WORKFLOW_STEPS}
-          activeStepIndex={activeStepIndex}
-          onStepChange={handleStepChange}
-        />
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <StepSelector
+              templateCode={templateCode}
+              steps={workflowSteps}
+              activeStepIndex={activeStepIndex}
+              onStepChange={handleStepChange}
+              onRemoveQuery={removeQueryStep}
+              onMoveStep={moveStep}
+            />
+          </div>
+          <button
+            onClick={addQueryStep}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium border border-purple-300 whitespace-nowrap"
+            title="Add a new Query step"
+          >
+            <Plus className="w-4 h-4" />
+            Add Query
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 flex overflow-y-scroll">
@@ -1823,26 +1916,42 @@ export function RequestResponseMapper() {
                 placeholder="Paste your cURL command here..."
                 className="w-full h-32 p-3 font-mono text-xs bg-gray-900 text-green-400 rounded-lg border border-gray-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none"
               />
-              <input
-                type="text"
-                value={currentStepName}
-                onChange={(e) => setCurrentStepName(e.target.value)}
-                placeholder="Step name (e.g., TOKEN, QUERY)"
-                className="w-full mt-2 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
-              />
               <select
-                value={nextStepName}
+                value={nextStepId || ""}
                 onChange={(e) => handleNextStepChange(e.target.value)}
-                className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                className="w-full mt-2 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
               >
                 <option value="" disabled>
                   Select Next Step
                 </option>
-                <option value="QUERY">QUERY</option>
-                <option value="SETUP">SETUP</option>
-                <option value="PAYMENT">PAYMENT</option>
+
+                {workflowSteps
+                  .filter((s) => s.id !== currentStepId)
+                  .map((s) => {
+                    const isQuery = s.name === "QUERY";
+                    const querySteps = workflowSteps.filter(
+                      (step) => step.name === "QUERY",
+                    );
+                    const queryNumber = isQuery
+                      ? querySteps.indexOf(s) + 1
+                      : null;
+
+                    let label = s.name;
+                    if (isQuery) {
+                      label += ` #${queryNumber}`;
+                    }
+                    label += ` (Step ${s.index + 1})`;
+
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
+
                 <option value="DONE">DONE</option>
               </select>
+
               {error && (
                 <div className="mt-2 p-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg">
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -1970,7 +2079,7 @@ export function RequestResponseMapper() {
                       Request
                     </span>
                     <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
-                      {currentStep?.name}
+                      {currentStepName}
                     </span>
                   </div>
                   {parsedRequest && (
@@ -2098,7 +2207,7 @@ export function RequestResponseMapper() {
               <WorkflowMindMap
                 parsedRequest={parsedRequest || undefined}
                 parsedResponse={response || undefined}
-                stepName={currentStep?.name}
+                stepName={currentStepName}
                 stepIndex={activeStepIndex}
                 inheritedContext={inheritedContext}
                 onCanvasStateChange={handleCanvasStateChange}
@@ -2133,14 +2242,14 @@ export function RequestResponseMapper() {
                       : "Template Configuration"}
                   </span>
                   <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
-                    {currentStep?.name}
+                    {currentStepName}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
                       try {
-                        JSON.parse(stepJsonConfigs[activeStepIndex] || "{}");
+                        JSON.parse(stepJsonConfigs[currentStepId] || "{}");
                         setJsonSaved(true);
                         setTimeout(() => setJsonSaved(false), 2000);
                       } catch (e) {
@@ -2159,7 +2268,7 @@ export function RequestResponseMapper() {
                   <button
                     onClick={() =>
                       handleCopy(
-                        stepJsonConfigs[activeStepIndex] || currentConfig,
+                        stepJsonConfigs[currentStepId] || currentConfig,
                       )
                     }
                     className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
@@ -2176,13 +2285,13 @@ export function RequestResponseMapper() {
               <div className="flex-1 p-4 overflow-auto">
                 <textarea
                   value={
-                    stepJsonConfigs[activeStepIndex] ||
+                    stepJsonConfigs[currentStepId] ||
                     JSON.stringify(currentConfig, null, 2)
                   }
                   onChange={(e) => {
                     setStepJsonConfigs((prev) => ({
                       ...prev,
-                      [activeStepIndex]: e.target.value,
+                      [currentStepId]: e.target.value,
                     }));
                   }}
                   className="w-full h-full font-mono text-xs bg-gray-900 text-green-400 p-4 rounded-lg border border-gray-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none"
@@ -2205,7 +2314,7 @@ export function RequestResponseMapper() {
           )}
         </div>
       </div>
-      {/* Preview JSON Modal */}
+
       {showPreviewModal && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -2215,7 +2324,6 @@ export function RequestResponseMapper() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 rounded-t-2xl">
               <div>
                 <h3 className="text-lg font-bold text-gray-800">
@@ -2233,7 +2341,6 @@ export function RequestResponseMapper() {
               </button>
             </div>
 
-            {/* Content */}
             <div className="flex-1 overflow-auto p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -2269,7 +2376,6 @@ export function RequestResponseMapper() {
               />
             </div>
 
-            {/* Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
               <button
                 onClick={() => setShowPreviewModal(false)}

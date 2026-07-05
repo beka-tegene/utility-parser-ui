@@ -60,6 +60,7 @@ interface AppState {
     | "mapper"
     | "test"
     | "collections"
+    | "all_list"
     | "Documentation"
     | "Error"
     | "Success";
@@ -68,6 +69,7 @@ interface AppState {
       | "mapper"
       | "test"
       | "collections"
+      | "all_list"
       | "Documentation"
       | "Error"
       | "Success",

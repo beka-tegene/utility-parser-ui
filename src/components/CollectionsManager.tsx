@@ -39,7 +39,7 @@ import {
 import { toast } from "sonner";
 import ShowGroupModal from "./ShowGroupModal";
 
-const getCollectionIcon = (name: string) => {
+export const getCollectionIcon = (name: string) => {
   const lowerName = name.toLowerCase();
 
   if (lowerName.includes("travel") || lowerName.includes("transport")) {
@@ -69,7 +69,7 @@ const getCollectionIcon = (name: string) => {
 };
 
 // Get gradient based on category name
-const getCollectionGradient = (name: string) => {
+export const getCollectionGradient = (name: string) => {
   const lowerName = name.toLowerCase();
 
   if (lowerName.includes("travel") || lowerName.includes("transport")) {
@@ -274,10 +274,10 @@ export function CollectionsManager() {
     setEditModalOpen(true);
   };
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [collectionCodes, setCollectionCodes] = useState("");
   const [groupName, setGroupName] = useState("");
   const [groupCode, setGroupCode] = useState("");
   const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
-  const [collectionCodes, setCollectionCodes] = useState("");
 
   const handleSwitchAccount = (collection: any) => {
     setShowGroupModal(true);
